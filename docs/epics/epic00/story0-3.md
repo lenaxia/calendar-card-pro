@@ -33,7 +33,7 @@ This decouples the schema from the rendering work and gives reviewers an easy fi
   time_grid_show_now_line: boolean;                // default true (used by epic02)
   ```
 
-  *Note: fields used only in epic01 (`time_grid_max_days`, `time_grid_navigation_days`, breakpoints) and epic02 (`time_grid_allday_bg_opacity`, `time_grid_allday_max_height`) are NOT added in this story; they're added by their respective epics. Adding them now would create unused config surface.*
+  *Note: fields used only in epic01 (`time_grid_max_days`, `time_grid_navigation_days`, breakpoints) and epic02 (`time_grid_allday_bg_opacity`) are NOT added in this story; they're added by their respective epics. Adding them now would create unused config surface.*
 
 - [ ] `src/config/config.ts` adds matching entries to `DEFAULT_CONFIG` (all required for `filterDefaultValues` to omit defaults from saved YAML)
 - [ ] `setConfig` validates `view`: any value other than `'list'` or `'time-grid'` is silently coerced to `'list'`, with a `Logger.warn` (FR-1.4)
@@ -52,7 +52,34 @@ This decouples the schema from the rendering work and gives reviewers an easy fi
 ## Technical notes
 
 - **Why flat scalars**: `setConfig` does `{ ...DEFAULT_CONFIG, ...config }` (shallow merge) at `src/calendar-card-pro.ts:478`. Nested objects lose their default values when the user provides a partial nested object. This was design-doc bug v2-C1; the fix is "always flat scalars". The existing `weather` field gets a special-case deep-clone in `helpers.ts:346`; we don't add more such cases.
-- **Validation in `setConfig`**: place the validation block **between line 482 (the `let mergedConfig = {...}` merge) and line 488 (`this.config = mergedConfig` assignment)**. The block mutates `mergedConfig` in place — fixing invalid values to defaults — so that downstream `instanceId` regen and `hasConfigChanged` see only valid values.
+- **Validation in `setConfig`**: place the validation block **between line 482 (the `let mergedConfig = {...}` merge) and line 488 (`this.config = mergedConfig` assignment)**. The block mutates `mergedConfig` in place — fixing invalid values to defaults — so that downstream `instanceId` regen and `hasConfigChanged` see only valid values. Sketch:
+  ```ts
+  let mergedConfig = { ...Config.DEFAULT_CONFIG, ...config };
+
+  // Validate view (FR-1.4)
+  if (mergedConfig.view !== 'list' && mergedConfig.view !== 'time-grid') {
+    Logger.warn(`Invalid view '${mergedConfig.view}', falling back to 'list'`);
+    mergedConfig.view = 'list';
+  }
+
+  // Validate hour range (FR-2.3): 0 <= start <= 23, 1 <= end <= 24, start < end
+  const sh = mergedConfig.time_grid_start_hour;
+  const eh = mergedConfig.time_grid_end_hour;
+  if (!Number.isInteger(sh) || sh < 0 || sh > 23 ||
+      !Number.isInteger(eh) || eh < 1 || eh > 24 || sh >= eh) {
+    Logger.warn(`Invalid hour range start=${sh}, end=${eh}; resetting to defaults`);
+    mergedConfig.time_grid_start_hour = 6;
+    mergedConfig.time_grid_end_hour = 22;
+  }
+
+  // Validate interval (FR-2.4): only 15, 30, 60
+  if (![15, 30, 60].includes(mergedConfig.time_grid_interval_minutes)) {
+    Logger.warn(`Invalid interval ${mergedConfig.time_grid_interval_minutes}; using 30`);
+    mergedConfig.time_grid_interval_minutes = 30;
+  }
+
+  this.config = mergedConfig;
+  ```
 - **Why `Logger.warn` not throw**: existing setConfig is tolerant — it never throws. Matching that style.
 
 ## Files touched

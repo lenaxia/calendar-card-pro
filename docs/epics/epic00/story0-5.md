@@ -67,6 +67,7 @@ This is the smallest possible host change that makes the feature observable. Lar
 ## Technical notes
 
 - **`viewOffsetDays` and `visibleDays` as `@property({ attribute: false })`**: Lit auto-detects identity changes (`!==`) and triggers re-render. No explicit `requestUpdate()` needed.
+- **Import the renderer**: add `import * as RenderGrid from './rendering/render-grid';` near the existing `import * as Render from './rendering/render';` (matches the namespace convention used throughout `calendar-card-pro.ts`).
 - **No `setConfig` change in this story**: the schema fields and validation already arrived in story0-3; here we only consume `this.config.view`.
 - **No `connectedCallback` changes**: ResizeObserver wiring waits for epic01.
 - **No `disconnectedCallback` changes**: nothing to clean up yet.

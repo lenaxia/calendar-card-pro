@@ -29,7 +29,7 @@ The renderer (story0-4) emits CSS classes (`ccp-grid`, `ccp-grid-day-column`, `c
   - `.ccp-grid-headers, .ccp-grid-allday` — `display: grid` (template-columns set inline by renderer)
   - `.ccp-grid-body` — `display: grid; grid-template-columns: var(--calendar-card-grid-time-axis-width, 48px) 1fr` (this is what guarantees axis aligns with headers — F-1 fix from design doc v3 review)
   - `.ccp-grid-columns` — `display: grid` (template-columns set inline)
-  - `.ccp-grid-day-column` — `position: relative; min-height: 24px; border-left: 1px solid var(--calendar-card-day-separator-color, transparent)`
+  - `.ccp-grid-day-column` — `position: relative; min-height: 24px; border-inline-start: 1px solid var(--calendar-card-day-separator-color, transparent)` (RTL-correct; matches `.ccp-grid-event` pattern)
   - `.ccp-grid-time-axis` — `position: relative; font-size: var(--calendar-card-font-size-time)` (hour labels positioned absolutely inside)
   - `.ccp-grid-allday` — `max-height: var(--calendar-card-grid-allday-max-height, 6em); overflow: hidden` (epic02 will fill content)
   - `.ccp-grid-event` — `position: absolute; border-inline-start: 2px solid var(--calendar-card-line-color-vertical); background: var(--calendar-card-line-color-vertical); border-radius: var(--calendar-card-grid-event-radius, 4px); font-size: var(--calendar-card-font-size-event); overflow: hidden`

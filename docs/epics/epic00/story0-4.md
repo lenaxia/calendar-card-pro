@@ -69,7 +69,7 @@ Per the design doc, this story renders **only the grid body and timed events**. 
   - `.ccp-grid-event` per event, with inline `styleMap` for `top`/`height`/`left`/`width`
   - Now-line element: NOT rendered in this epic (epic02 adds it)
 - [ ] `grid-template-columns` set inline via `styleMap` (NOT via `repeat(var(--n))`)
-- [ ] Hour-axis labels via `formatHourLabel(hour, use24h)`; range `[start_hour, end_hour - 1]` (excludes `end_hour` to avoid hour-24 edge case)
+- [ ] Hour-axis labels via `Grid.formatHourLabel(hour, use24h)`; range `[start_hour, end_hour - 1]` (excludes `end_hour` to avoid hour-24 edge case)
 - [ ] Per-event content uses progressive disclosure:
   - Always: title (truncated)
   - When `heightPx ≥ 32px`: + start-end time

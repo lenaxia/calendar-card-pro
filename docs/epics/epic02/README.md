@@ -21,7 +21,6 @@ After this epic, the time-grid view feels alive — at-a-glance you know what's 
 
 - `time_grid_show_now_line: boolean` (default `true`) — already added in epic00 story0-3, used here
 - `time_grid_allday_bg_opacity: number` (default `0.2`) — banner background alpha (independent of list-view's `event_background_opacity` to avoid contrast issues)
-- `time_grid_allday_max_height: string` (default `'6em'`) — banner-strip max height; overflow clipped via CSS
 - All-day banner placement using `daysBetween` (added in epic00 story0-2):
   - `dayIdx = max(0, daysBetween(windowStart, eventStartDay))`
   - `eventEndDay = parseAllDayDate(event.end.date); eventEndDay.setDate(getDate() - 1)` (iCal exclusive → inclusive)
