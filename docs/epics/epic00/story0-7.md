@@ -21,20 +21,22 @@ This story is small but should be a separate commit because it's the only host c
 
 ## Acceptance criteria
 
-- [ ] `src/calendar-card-pro.ts` adds a public `getCardSize()` method that **only returns a value for `view: 'time-grid'`**. For list view, the method is undefined (HA defaults to size 1). This avoids any list-view behavior change (per AGENTS.md Rule 5):
+- [ ] **Pure math extracted to `src/utils/grid.ts:computeCardSize(config)`** so it can be unit-tested without instantiating the LitElement host:
   ```ts
-  public getCardSize(): number | undefined {
-    if (this.config.view !== 'time-grid') return undefined;  // list view: HA default
+  // In utils/grid.ts:
+  export function computeCardSize(config: Pick<Types.Config,
+    'view' | 'time_grid_start_hour' | 'time_grid_end_hour' |
+    'time_grid_interval_minutes' | 'max_height'>): number {
+    if (config.view !== 'time-grid') return 1;  // list view: HA documented default
 
-    const slotsPerHour = 60 / this.config.time_grid_interval_minutes;
-    const slotPx = Grid.SLOT_HEIGHT_PX;  // = 24
-    const gridPx = (this.config.time_grid_end_hour - this.config.time_grid_start_hour)
-                 * slotsPerHour * slotPx;
+    const slotsPerHour = 60 / config.time_grid_interval_minutes;
+    const gridPx = (config.time_grid_end_hour - config.time_grid_start_hour)
+                 * slotsPerHour * SLOT_HEIGHT_PX;
     const chromePx = 80;  // nav header + day headers (approximation)
     let totalPx = gridPx + chromePx;
 
     // Best-effort clamp to max_height if it's a px value
-    const mh = this.config.max_height;
+    const mh = config.max_height;
     if (mh && mh !== 'none' && mh.endsWith('px')) {
       const mhPx = parseFloat(mh);
       if (!isNaN(mhPx)) totalPx = Math.min(totalPx, mhPx);
@@ -43,10 +45,16 @@ This story is small but should be a separate commit because it's the only host c
     return Math.max(1, Math.ceil(totalPx / 50));
   }
   ```
-- [ ] Returns `undefined` for `view: 'list'` — preserves existing HA-default behavior (no list-view scope change)
+- [ ] `src/calendar-card-pro.ts` adds a public `getCardSize()` method that just delegates to the helper:
+  ```ts
+  public getCardSize(): number {
+    return Grid.computeCardSize(this.config);
+  }
+  ```
+- [ ] Returns `1` for `view: 'list'` — matches HA's documented default ("A card size of `1` will be assumed if the method is not defined") and is explicit/idiomatic. List view masonry-mode behavior is unchanged.
 - [ ] Returns `Math.ceil((gridPx + 80) / 50)` for `view: 'time-grid'`, clamped if `max_height` is a px value
-- [ ] Test cases (in `test/utils/grid.test.ts`):
-  - `view: 'list'` → `undefined`
+- [ ] Test cases (in `test/utils/grid.test.ts` — testing the pure helper, not the host method):
+  - `view: 'list'` → `1`
   - `view: 'time-grid', start=6, end=22, interval=30` → `17` (= `ceil((16*2*24 + 80)/50) = ceil(848/50)`)
   - same + `max_height='400px'` → `8` (= `ceil(400/50)`)
   - `view: 'time-grid', start=0, end=24, interval=60` → `14` (= `ceil((24*1*24 + 80)/50) = ceil(656/50)`)
@@ -62,14 +70,16 @@ This story is small but should be a separate commit because it's the only host c
 
 - **Why `chromePx = 80`**: nav header ~40px + day headers ~40px (approximation; actual depends on font sizes set by user). Off-by-a-few-rows is acceptable since `getCardSize` is itself approximate per HA docs.
 - **Why `max_height` clamp**: if user explicitly sets `max_height: '400px'` and the grid would be 848px, masonry should allocate 8 rows (400/50), not 17 (848/50). Without clamp, masonry over-allocates.
-- **Why list view returns `undefined`**: existing card has no `getCardSize`. Returning a number from this story would CHANGE list-view behavior in masonry mode (HA's default is size 1). To preserve byte-identical list-view behavior (AGENTS.md Rule 5), we only return a value when `view === 'time-grid'`. List view stays at HA default.
+- **Why list view returns `1` (not `undefined`)**: HA docs state "A card size of `1` will be assumed if the method is not defined" — returning `1` makes the behavior explicit and idiomatic. Per AGENTS.md Rule 5, list-view masonry distribution is unchanged from "method not defined" because `1` IS the implied default.
+- **Why `computeCardSize` is in `utils/grid.ts`, not the host**: pure math; testable without instantiating LitElement; consistent with where the rest of the grid math lives.
 - **`SLOT_HEIGHT_PX`** comes from `src/utils/grid.ts` (story0-2). Don't hardcode `24` here — that would create the inconsistency we explicitly avoided.
 
 ## Files touched
 
 ```
-src/calendar-card-pro.ts                  +1 method (~20 lines)
-test/utils/grid.test.ts (or new file)     +4 test cases
+src/utils/grid.ts                         +computeCardSize helper (~15 lines)
+src/calendar-card-pro.ts                  +getCardSize method (~3 lines, delegates to helper)
+test/utils/grid.test.ts                   +4 test cases
 ```
 
 ## Definition of done

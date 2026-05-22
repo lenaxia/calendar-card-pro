@@ -73,7 +73,7 @@ Per the design doc, this story renders **only the grid body and timed events**. 
 - [ ] Per-event content uses progressive disclosure:
   - Always: title (truncated)
   - When `heightPx ≥ 32px`: + start-end time
-  - When `heightPx ≥ 56px`: + location (if `getEntitySetting(event._entityId, 'show_location', config, event)` is true)
+  - When `heightPx ≥ 56px`: + location (if `EventUtils.getEntitySetting(event._entityId, 'show_location', config, event) ?? config.show_location` is true)
 - [ ] Empty events (`events.length === 0`): renders headers + axis + columns; no event blocks (FR-2.12)
 - [ ] No imports from DOM/HA APIs except types; no `document.querySelector` or similar (the host owns DOM mutation)
 
@@ -81,10 +81,11 @@ Per the design doc, this story renders **only the grid body and timed events**. 
 
 - Responsive `visibleDays` switching (epic01)
 - Real navigation handlers (epic01 — for this epic, the buttons just render disabled)
-- Window alignment logic for N=7 week-aligned vs N=1/3 rolling (epic01; this epic always renders 7 days starting at `today`)
 - All-day banner rendering (epic02 — this epic emits an empty `.ccp-grid-allday` placeholder)
 - Now-line element (epic02)
 - All-day strip overflow indicators / `time_grid_allday_bg_opacity` (epic02)
+
+*Note: this story DOES use `snapToWindow` from day one, including its built-in week-alignment for N=7. So a YAML user with `view: 'time-grid'` (no responsive switching yet — `visibleDays = 7` hardcoded) will see a Mon-Sun (or Sun-Sat per `first_day_of_week`) week. This is intentional — epic01 just adds the responsive switching, not the alignment logic.*
 
 ## Technical notes
 

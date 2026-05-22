@@ -35,6 +35,21 @@ epic00 hard-coded `visibleDays = 7`. This story makes it responsive via `ResizeO
 - [ ] New private method `_syncObserver()`:
   - When `config.view === 'time-grid'` and `this.isConnected`: create observer if not present, observe `this`
   - Otherwise: disconnect observer if present
+  ```ts
+  private _syncObserver(): void {
+    const wantObserver = this.config.view === 'time-grid' && this.isConnected;
+    if (wantObserver && !this._resizeObserver) {
+      // CRITICAL: bind via arrow function so `this` is preserved when ResizeObserver
+      // invokes the callback. `new ResizeObserver(this._onResize)` would lose `this`
+      // because ResizeObserver invokes the callback with no specific `this` context.
+      this._resizeObserver = new ResizeObserver(() => this._onResize());
+      this._resizeObserver.observe(this);
+    } else if (!wantObserver && this._resizeObserver) {
+      this._resizeObserver.disconnect();
+      this._resizeObserver = undefined;
+    }
+  }
+  ```
 - [ ] New private method `_onResize()`:
   - Coalesce via `requestAnimationFrame` (skip if `_resizeRafId !== undefined`)
   - In RAF: read **`this.offsetWidth`** directly — simpler and always reflects the current measurement (avoids closure-staleness if multiple ResizeObserver entries arrive between RAF schedule and execution). The `entries` argument from ResizeObserver is unused.
