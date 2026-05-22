@@ -437,6 +437,14 @@ class CalendarCardPro extends LitElement {
     }
   }
 
+  private _maxOffset(): number {
+    return Math.max(0, this.config.time_grid_navigation_days - this.visibleDays);
+  }
+
+  private _shiftDays(delta: number): void {
+    this.viewOffsetDays = Grid.clampOffset(this.viewOffsetDays, delta, this._maxOffset());
+  }
+
   /**
    * Handle pointer down events for hold detection
    */
@@ -711,13 +719,13 @@ class CalendarCardPro extends LitElement {
           visibleDays: this.visibleDays,
           offsetDays: this.viewOffsetDays,
           now: new Date(),
-          onShiftDay: () => {},
-          onShiftWindow: () => {},
+          onShiftDay: (d) => this._shiftDays(d),
+          onShiftWindow: (d) => this._shiftDays(d * this.visibleDays),
           onResetToToday: () => {
             this.viewOffsetDays = 0;
           },
-          canShiftBack: false,
-          canShiftForward: false,
+          canShiftBack: this.viewOffsetDays > 0,
+          canShiftForward: this.viewOffsetDays < this._maxOffset(),
         },
         this.safeHass,
       );

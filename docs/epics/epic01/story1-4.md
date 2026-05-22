@@ -25,11 +25,8 @@ This is also where **`hasConfigChanged` becomes view-aware** — toggling betwee
 
 ## Acceptance criteria
 
-- [ ] `src/config/types.ts` adds:
-  ```ts
-  time_grid_navigation_days: number;     // default 28
-  ```
-- [ ] `src/config/config.ts` adds matching `DEFAULT_CONFIG` entry
+- [x] ~~`src/config/types.ts` adds `time_grid_navigation_days: number; // default 28`~~ — **already done in story 1-2** (carry-over: story 1-2's `_maxOffset()` needed the field). This story builds on the existing schema entry.
+- [x] ~~`src/config/config.ts` adds matching `DEFAULT_CONFIG` entry~~ — **already done in story 1-2**.
 - [ ] `src/utils/events.ts` `fetchEventData` adds an optional 5th parameter:
   ```ts
   export async function fetchEventData(

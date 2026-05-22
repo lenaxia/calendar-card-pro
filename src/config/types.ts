@@ -128,6 +128,8 @@ export interface Config {
   time_grid_breakpoint_three_day_px: number;
   /** Minimum host width in pixels at which the grid promotes from 3-day to 7-day layout. */
   time_grid_breakpoint_seven_day_px: number;
+  /** Total number of days fetched and navigable in the time-grid view. The user can shift the visible window forward/backward within this range. */
+  time_grid_navigation_days: number;
 
   // Actions
   tap_action: ActionConfig;

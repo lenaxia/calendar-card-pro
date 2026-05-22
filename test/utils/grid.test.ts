@@ -5,6 +5,7 @@ import {
   SLOT_HEIGHT_PX,
   buildDayWindow,
   chooseVisibleDays,
+  clampOffset,
   computeCardSize,
   computeEventPlacement,
   daysBetween,
@@ -537,5 +538,27 @@ describe('computeCardSize', () => {
         time_grid_interval_minutes: 60,
       }),
     ).toBe(14);
+  });
+});
+
+describe('clampOffset', () => {
+  it('G-4.4: clampOffset(21, +7, 21) returns 21 (max-clamp at upper bound)', () => {
+    expect(clampOffset(21, 7, 21)).toBe(21);
+  });
+
+  it('clampOffset(21, -7, 21) returns 14 (within range)', () => {
+    expect(clampOffset(21, -7, 21)).toBe(14);
+  });
+
+  it('clampOffset(21, +1, 21) returns 21 (already at max, no-op)', () => {
+    expect(clampOffset(21, 1, 21)).toBe(21);
+  });
+
+  it('clampOffset(0, -1, 21) returns 0 (lower-clamp)', () => {
+    expect(clampOffset(0, -1, 21)).toBe(0);
+  });
+
+  it('clampOffset(10, 5, 21) returns 15 (within range)', () => {
+    expect(clampOffset(10, 5, 21)).toBe(15);
   });
 });

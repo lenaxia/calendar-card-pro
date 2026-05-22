@@ -150,6 +150,18 @@ export function snapToWindow(
 //-----------------------------------------------------------------------------
 
 /**
+ * Clamps a navigation offset (current + delta) to the valid range [0, max].
+ * Pure helper extracted from the host's `_shiftDays` so the math is testable.
+ *
+ * @param current - current `viewOffsetDays`
+ * @param delta - signed shift in days (positive = forward, negative = backward)
+ * @param max - upper bound, typically `time_grid_navigation_days - visibleDays`
+ */
+export function clampOffset(current: number, delta: number, max: number): number {
+  return Math.max(0, Math.min(max, current + delta));
+}
+
+/**
  * Picks 1, 3, or 7 visible days based on container width and breakpoints,
  * applying `cap` as the maximum. A `widthPx === 0` input is the
  * pre-measurement fallback and returns `cap` directly.

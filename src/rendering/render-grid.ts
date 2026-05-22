@@ -112,16 +112,69 @@ export function renderTimeGrid(
   const bodyColumns = buildBodyColumns(days.length);
 
   const todayLabel = String(Localize.translate(language, 'time_grid_today', 'Today'));
+  const prevDayLabel = String(
+    Localize.translate(language, 'time_grid_prev_day_aria', 'Previous day'),
+  );
+  const nextDayLabel = String(Localize.translate(language, 'time_grid_next_day_aria', 'Next day'));
+  const prevWindowLabel = String(
+    Localize.translate(language, 'time_grid_prev_window_aria', `Previous ${ctx.visibleDays} days`),
+  ).replace('{n}', String(ctx.visibleDays));
+  const nextWindowLabel = String(
+    Localize.translate(language, 'time_grid_next_window_aria', `Next ${ctx.visibleDays} days`),
+  ).replace('{n}', String(ctx.visibleDays));
+
+  const navClick = (handler: () => void) => (e: Event) => {
+    e.stopPropagation();
+    handler();
+  };
+  const backDisabled = ctx.canShiftBack ? 'false' : 'true';
+  const forwardDisabled = ctx.canShiftForward ? 'false' : 'true';
 
   return html`
     <div class="ccp-grid">
       <div class="ccp-grid-nav">
         <button
+          class="ccp-grid-prev-window"
+          aria-label=${prevWindowLabel}
+          aria-disabled=${backDisabled}
+          @click=${navClick(() => ctx.onShiftWindow(-1))}
+        >
+          «
+        </button>
+        ${ctx.visibleDays !== 7
+          ? html`<button
+              class="ccp-grid-prev-day"
+              aria-label=${prevDayLabel}
+              aria-disabled=${backDisabled}
+              @click=${navClick(() => ctx.onShiftDay(-1))}
+            >
+              ‹
+            </button>`
+          : nothing}
+        <button
           class="ccp-grid-today"
-          @click=${ctx.onResetToToday}
-          ?disabled=${todayIdx === 0 && ctx.offsetDays === 0}
+          aria-label=${todayLabel}
+          @click=${navClick(ctx.onResetToToday)}
         >
           ${todayLabel}
+        </button>
+        ${ctx.visibleDays !== 7
+          ? html`<button
+              class="ccp-grid-next-day"
+              aria-label=${nextDayLabel}
+              aria-disabled=${forwardDisabled}
+              @click=${navClick(() => ctx.onShiftDay(1))}
+            >
+              ›
+            </button>`
+          : nothing}
+        <button
+          class="ccp-grid-next-window"
+          aria-label=${nextWindowLabel}
+          aria-disabled=${forwardDisabled}
+          @click=${navClick(() => ctx.onShiftWindow(1))}
+        >
+          »
         </button>
         <span class="ccp-grid-range">${formatRangeLabel(days, language)}</span>
       </div>
