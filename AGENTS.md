@@ -329,6 +329,8 @@ calendar-card-pro/
 │   │   │                          getLocalDateKey
 │   │   ├── helpers.ts             generateDeterministicId, filterDefaultValues
 │   │   ├── logger.ts
+│   │   └── weather.ts             weather forecast subscription helpers
+│   ├── interaction/
 │   │   ├── actions.ts             tap_action / hold_action handling
 │   │   └── feedback.ts            visual feedback for hold gestures
 │   ├── rendering/

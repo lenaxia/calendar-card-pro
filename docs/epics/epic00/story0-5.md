@@ -26,6 +26,8 @@ This is the smallest possible host change that makes the feature observable. Lar
   @property({ attribute: false }) viewOffsetDays = 0;
   @property({ attribute: false }) visibleDays: 1 | 3 | 7 = 7;  // hard-coded 7 in this epic
   ```
+
+  *Note: `viewOffsetDays` exists as a reactive field from this story onward, but is only mutated by user input (nav buttons) starting in epic01. In epic00, the only mutation point is `onResetToToday` which sets it back to 0 — already its default — so it's effectively no-op. Adding the field early lets the renderer (story0-4) consume `ctx.offsetDays` from day one.*
 - [ ] `render()` adds the grid-view branch in the existing dispatch (after error checks, before list-empty check):
   ```
   isInitialLoad → 'loading'

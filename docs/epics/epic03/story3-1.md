@@ -19,7 +19,7 @@ Today the time-grid view is YAML-only. This story adds a `view` selector to Core
 
 ## Acceptance criteria
 
-- [ ] `src/rendering/editor.ts` adds a "View" dropdown inside the Core Settings expansion panel (near `start_date_mode`):
+- [ ] `src/rendering/editor.ts` adds a "View" dropdown inside the Core Settings expansion panel (near `start_date_mode`). The select uses **string values** (matches existing `first_day_of_week`, `time_24h` patterns):
   ```ts
   ${this.addSelectField(
     'view',
@@ -40,7 +40,11 @@ Today the time-grid view is YAML-only. This story adds a `view` selector to Core
     : nothing}
   ```
 - [ ] `compact_events_to_show`, `compact_days_to_show`, `compact_events_complete_days`, `show_empty_days`, `show_week_numbers` — wrap each in the same `view !== 'time-grid'` conditional. (These are all list-view concepts.)
-- [ ] New "Time grid" expansion panel, revealed only when `view === 'time-grid'`:
+- [ ] New "Time grid" expansion panel, revealed only when `view === 'time-grid'`. **All numeric fields use `addTextField` with `type='number'` (NOT `addSelectField`)** because:
+  - `addSelectField` `options` is typed `Array<{value: string; label: string}>` — TypeScript rejects numeric values
+  - `_valueChanged` already handles `type='number'` via `parseFloat` (editor.ts:449-452)
+  - This avoids hand-coding numeric conversion special cases (like the existing `time_24h` workaround in `setConfigValue`)
+
   ```ts
   ${this.getConfigValue('view') === 'time-grid'
     ? this.addExpansionPanel(
@@ -49,25 +53,11 @@ Today the time-grid view is YAML-only. This story adds a `view` selector to Core
         html`
           ${this.addTextField('time_grid_start_hour', this._getTranslation('time_grid_start_hour'), 'number')}
           ${this.addTextField('time_grid_end_hour', this._getTranslation('time_grid_end_hour'), 'number')}
-          ${this.addSelectField(
-            'time_grid_interval_minutes',
-            this._getTranslation('time_grid_interval_minutes'),
-            [
-              { value: 15, label: '15' },
-              { value: 30, label: '30' },
-              { value: 60, label: '60' },
-            ],
-          )}
+          ${this.addTextField('time_grid_interval_minutes', this._getTranslation('time_grid_interval_minutes'), 'number')}
+          <div class="helper-text">${this._getTranslation('time_grid_interval_minutes_note')}</div>
           ${this.addTextField('time_grid_event_min_height_px', this._getTranslation('time_grid_event_min_height_px'), 'number')}
-          ${this.addSelectField(
-            'time_grid_max_days',
-            this._getTranslation('time_grid_max_days'),
-            [
-              { value: 1, label: '1' },
-              { value: 3, label: '3' },
-              { value: 7, label: '7' },
-            ],
-          )}
+          ${this.addTextField('time_grid_max_days', this._getTranslation('time_grid_max_days'), 'number')}
+          <div class="helper-text">${this._getTranslation('time_grid_max_days_note')}</div>
           ${this.addTextField('time_grid_navigation_days', this._getTranslation('time_grid_navigation_days'), 'number')}
           ${this._renderNavigationDaysHint()}   // FR-7.6 — see below
           ${this.addTextField('time_grid_breakpoint_three_day_px', this._getTranslation('time_grid_breakpoint_three_day_px'), 'number')}
@@ -75,9 +65,11 @@ Today the time-grid view is YAML-only. This story adds a `view` selector to Core
           ${this.addBooleanField('time_grid_show_now_line', this._getTranslation('time_grid_show_now_line'))}
           ${this.addTextField('time_grid_allday_bg_opacity', this._getTranslation('time_grid_allday_bg_opacity'), 'number')}
         `,
+        false,    // 4th arg: expandedByDefault — collapsed by default to keep editor compact
       )
     : nothing}
   ```
+  The `_note` helper-text strings (e.g. `time_grid_interval_minutes_note: "Allowed values: 15, 30, 60"`) compensate for not using a select dropdown by guiding users on accepted values. Validation already happens in `setConfig` (epic00 story0-3) — invalid values are coerced to defaults with a `Logger.warn`.
 - [ ] Helper-text hint when `time_grid_navigation_days < time_grid_max_days` (FR-7.6):
   ```ts
   private _renderNavigationDaysHint() {
@@ -104,18 +96,24 @@ Today the time-grid view is YAML-only. This story adds a `view` selector to Core
 
 ## Technical notes
 
-- **`addSelectField`, `addTextField`, `addBooleanField`, `addExpansionPanel`** are existing helpers (verified in design doc A17). They take `(path, label, options/type)`.
+- **`addSelectField`, `addTextField`, `addBooleanField`, `addExpansionPanel`** are existing helpers (verified in editor.ts). Signatures:
+  - `addSelectField(name, label, options: Array<{value: string; label: string}>, clearable?, defaultValue?, changeCallback?)` — values are **strings only**. Use `addTextField(... 'number')` for numeric fields.
+  - `addTextField(name, label, type)` — `type` defaults to `'text'`; pass `'number'` for numeric inputs (handled by `_valueChanged` at editor.ts:449-452 via `parseFloat`).
+  - `addBooleanField(name, label)` — uses `ha-switch`; values handled at editor.ts:445-447.
+  - `addExpansionPanel(title, icon, content, expandedByDefault?)` — 4th arg is optional boolean, default `false`.
 - **`getConfigValue('path')`** supports dot notation, but we don't use dot notation here (all flat scalars).
 - **MDI icon for the panel**: `mdiViewWeek`, `mdiCalendarWeek`, or `mdiTableLarge` — pick one that fits visually with the existing card icons (existing panels use `mdiCalendarMonth`, `mdiPalette`, `mdiCog`).
-- **Validation in editor**: not added in this story. The host's `setConfig` (epic00 story0-3) coerces invalid values to defaults with `Logger.warn`. The editor inputs are number-typed, so HTML validation prevents non-numeric input naturally; range validation happens on save.
-- **`helper-text-warning` CSS class**: may not exist in current `styles.ts`; either add (light yellow background, dark text) or use existing `helper-text` (looks the same — just plain helper text).
+- **Conditional reveal pattern**: mirrors the existing `start_date_mode` pattern at `editor.ts:572` (`_handleStartDateModeChange`). Lit auto re-renders when `_config` changes via `_valueChanged → setConfigValue → _fireConfigChanged → this._config = mergedConfig` (reactive prop). No explicit `requestUpdate()` needed for our case (same as `start_date_mode`'s simple toggle).
+- **Validation**: not added in editor. The host's `setConfig` (epic00 story0-3) coerces invalid values to defaults with `Logger.warn`. The editor inputs are number-typed, so HTML validation prevents non-numeric input naturally; range validation happens on save via `setConfig`.
+- **`helper-text-warning` CSS class**: may not exist in current `styles.ts`. Either add a new class (light-yellow background, dark text) OR reuse plain `helper-text`. Recommend reusing `helper-text` to keep the style minimal.
 
 ## Files touched
 
 ```
-src/rendering/editor.ts          editor changes (~80 lines)
-src/rendering/styles.ts          optionally +helper-text-warning style (~5 lines)
+src/rendering/editor.ts          editor changes (~80 lines added inside Core Settings + new Time-grid panel)
 ```
+
+(no changes to `setConfigValue` needed — `addTextField` with `type='number'` covers numeric handling already)
 
 ## Definition of done
 

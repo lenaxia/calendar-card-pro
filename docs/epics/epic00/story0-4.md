@@ -43,17 +43,27 @@ Per the design doc, this story renders **only the grid body and timed events**. 
   }
   ```
 - [ ] Internal flow:
-  1. Filter `events` to the visible window (built from `now + offsetDays`, span `visibleDays`)
-  2. Apply `show_past_events: false` filter for **timed past events only** (per FR-2.11)
-  3. Split timed events crossing midnight via `splitTimedEventByDay`
-  4. For each day column: compute `EventPlacement` per event, run `layoutOverlaps`, apply `past-event` class via `isPastEvent(event, ctx.now)`
-  5. Determine `todayIdx` (index of `ctx.now`'s day within `ctx.days`); cache for use by markup
-  6. Emit Lit `html` (see markup spec in design doc §6.4)
+  1. **Build the visible-day window** via `Grid.snapToWindow`:
+     ```ts
+     const reference = Grid.getReferenceDate(config);
+     const firstDayOfWeek = FormatUtils.getFirstDayOfWeek(config, hass) as 0 | 1;
+     const { start: windowStart, days } = Grid.snapToWindow(
+       reference, ctx.offsetDays, ctx.visibleDays, firstDayOfWeek,
+     );
+     // `days` is the array of N midnight Dates that become the day-columns
+     ```
+     Using `snapToWindow` from day one (not naive `now + offsetDays`) means the renderer's day-array logic doesn't change in epic01 — epic01 just passes different `visibleDays`/`offsetDays` values.
+  2. Filter `events` to the visible window (keep only events whose start or end falls within `[windowStart, windowStart + visibleDays * 1day)`)
+  3. Apply `show_past_events: false` filter for **timed past events only** (per FR-2.11)
+  4. Split timed events crossing midnight via `Grid.splitTimedEventByDay`
+  5. For each day column: compute `EventPlacement` per event, run `Grid.layoutOverlaps`, apply `past-event` class via `Grid.isPastEvent(event, ctx.now)`
+  6. Determine `todayIdx`: `Grid.daysBetween(windowStart, startOfDay(ctx.now))`; valid only if `0 <= todayIdx < visibleDays`, otherwise `-1` (today not visible)
+  7. Emit Lit `html` (see markup spec below)
 - [ ] Markup includes:
   - `.ccp-grid` (root)
   - `.ccp-grid-nav` (placeholder buttons; epic01 fills them; for now: only `Today` button + range label, with `<` `>` `<<` `>>` rendered as `nothing` since `canShiftBack`/`canShiftForward` are false)
   - `.ccp-grid-headers` (axis spacer + day-of-week + day-of-month per column; first-of-month also shows month name)
-  - `.ccp-grid-allday` (renders empty placeholder for now; epic02 fills with banners)
+  - **`.ccp-grid-allday` strip is `nothing` (omitted entirely) in epic00.** No all-day banner rendering yet — epic02 swaps `nothing` for real banner rendering. Per FR-6.3 the strip should always be omitted when no banners exist anyway.
   - `.ccp-grid-body` with `.ccp-grid-time-axis` + `.ccp-grid-columns`
   - `.ccp-grid-day-column` per visible day, with `today` class when `i === todayIdx`
   - `.ccp-grid-event` per event, with inline `styleMap` for `top`/`height`/`left`/`width`

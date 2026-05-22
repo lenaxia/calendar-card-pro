@@ -58,8 +58,19 @@ This is also where **`hasConfigChanged` becomes view-aware** — toggling betwee
     effectiveDays,
   );
   ```
-- [ ] `src/config/config.ts` `hasConfigChanged` becomes **view-aware**:
+- [ ] `src/config/config.ts` `hasConfigChanged` becomes **view-aware**. The existing `dataChanged` block at `src/config/config.ts:234-239`:
   ```ts
+  // BEFORE (existing, lines ~234-239):
+  const dataChanged =
+    previousEntityIds !== currentEntityIds ||
+    previous.days_to_show !== current.days_to_show ||
+    previous.start_date !== current.start_date ||
+    previous.show_past_events !== current.show_past_events ||
+    previous.filter_duplicates !== current.filter_duplicates;
+  ```
+  Updated to:
+  ```ts
+  // AFTER:
   const isGridView = current.view === 'time-grid';
   const viewChanged = previous.view !== current.view;
   const dataChanged =
@@ -71,6 +82,7 @@ This is also where **`hasConfigChanged` becomes view-aware** — toggling betwee
     previous.show_past_events !== current.show_past_events ||
     previous.filter_duplicates !== current.filter_duplicates;
   ```
+  The function still returns `dataChanged || refreshIntervalChanged` (don't change the return statement). Logger debug message also unchanged.
 - [ ] Test: spec G-hasConfigChanged (5 cases):
   - view list → time-grid (same other config) → `true` (view toggle)
   - view time-grid, days_to_show 3 → 5, no other changes → `false` (ignored in grid)

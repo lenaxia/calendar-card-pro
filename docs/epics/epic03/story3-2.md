@@ -35,8 +35,10 @@ Story3-1 added `_getTranslation('view_time_grid')`, `_getTranslation('time_grid_
       "time_grid_start_hour": "Start hour",
       "time_grid_end_hour": "End hour",
       "time_grid_interval_minutes": "Slot interval (minutes)",
+      "time_grid_interval_minutes_note": "Allowed values: 15, 30, 60",
       "time_grid_event_min_height_px": "Minimum event height (px)",
       "time_grid_max_days": "Maximum visible days",
+      "time_grid_max_days_note": "Allowed values: 1, 3, 7",
       "time_grid_navigation_days": "Navigation window (days)",
       "time_grid_navigation_days_warning": "Navigation window is smaller than maximum visible days. Consider increasing it.",
       "time_grid_breakpoint_three_day_px": "Three-day breakpoint (px)",
@@ -52,7 +54,13 @@ Story3-1 added `_getTranslation('view_time_grid')`, `_getTranslation('time_grid_
   }
   ```
 - [ ] The 5 navigation strings (`time_grid_today`, `time_grid_prev_day_aria`, etc.) live at the **top level** of `en.json` (not under `editor`) because they're user-facing UI strings, not editor-only labels. Verify by reading `localize.ts` for the existing pattern (e.g., `noEvents`, `errorMessage` are top-level).
-- [ ] Templated strings like `time_grid_prev_window_aria: "Previous {n} days"` use `{n}` placeholder; the renderer/host substitutes `n` with `visibleDays` at render time. Check how existing templated strings work in the project (`localize.ts:translate(lang, key, fallback)` may not handle interpolation; might need to do `.replace('{n}', String(n))` at the call site).
+- [ ] Templated strings like `time_grid_prev_window_aria: "Previous {n} days"` use `{n}` placeholder. **The existing `Localize.translate(lang, key, fallback)` does NOT do interpolation** (verified by reading `localize.ts:177-209`). The renderer must do `.replace('{n}', String(visibleDays))` at the call site:
+  ```ts
+  // In render-grid.ts:
+  const t = (key: string) => Localize.translate(language, key, key) as string;
+  const ariaPrev = t('time_grid_prev_window_aria').replace('{n}', String(visibleDays));
+  ```
+  Alternative considered: add `{n}` interpolation to `Localize.translate`. Rejected — adds shared infra for one use case.
 - [ ] `src/rendering/render-grid.ts` updated so navigation buttons consume the translated strings:
   ```ts
   const t = (key: string) => Localize.translate(language, key, key);

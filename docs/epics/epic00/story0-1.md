@@ -21,11 +21,27 @@ The repo currently has **no test framework**. Per the design doc §10, time-grid
 - [ ] `vitest` added to `devDependencies` in `package.json` (single new dep; pinned version, e.g. `^2.1.0`)
 - [ ] `npm test` script runs `vitest run` (one-shot) and exits 0 with no tests
 - [ ] `npm run test:watch` script runs `vitest` (watch mode)
-- [ ] `tsconfig.json` either unchanged OR augmented with a `vitest`-compatible config block (no `noEmit: false` toggle — esbuild still owns the build)
-- [ ] `eslint.config.mjs` does not reject test files (verify by running `npm run lint`)
+- [ ] **`tsconfig.json` `include` extended to cover `test/**/*.ts`**:
+  ```jsonc
+  // Before:
+  "include": ["src/**/*"]
+  // After:
+  "include": ["src/**/*", "test/**/*"]
+  ```
+  This is required because the existing `tsconfig.json` only includes `src/`. Without this extension, Vitest can't type-check test files. The build still uses esbuild (not `tsc`), so this `include` change has no effect on the production bundle.
+- [ ] **`eslint.config.mjs` files glob updated to include `test/`**:
+  ```js
+  // Before:
+  files: ['src/**/*.ts'],
+  // After:
+  files: ['src/**/*.ts', 'test/**/*.ts'],
+  ```
+  This ensures test files follow the same lint rules (no `any`, import order, prettier). Verify by running `npm run lint` — it should now lint test files too. Existing test placeholder must pass lint.
 - [ ] An empty test file `test/utils/grid.test.ts` exists with `import { describe, it, expect } from 'vitest';` and a single placeholder `describe.skip('grid', () => { it('TODO', () => { expect(1).toBe(1); }); });`
-- [ ] `npm run build` continues to pass (no impact on production bundle)
+- [ ] `npm run lint` passes with the test file in place (the skipped test should not fail lint)
+- [ ] `npm run build` continues to pass (no impact on production bundle — verify `dist/calendar-card-pro.js` byte size unchanged ± few bytes)
 - [ ] No existing test files in `src/` are touched
+- [ ] `package-lock.json` is committed alongside (since `vitest` adds dependencies; per AGENTS.md Rule 9, lockfile changes are OK when accompanying a real dependency change)
 
 ## Out of scope
 
@@ -45,8 +61,10 @@ The repo currently has **no test framework**. Per the design doc §10, time-grid
 
 ```
 package.json                 +2 devDeps line, +2 scripts
+package-lock.json            regenerated (committed; new real dependency)
+tsconfig.json                include extended to test/**/*
+eslint.config.mjs            files glob extended to test/**/*.ts
 test/utils/grid.test.ts      new (placeholder)
-package-lock.json            regenerated
 ```
 
 ## Definition of done

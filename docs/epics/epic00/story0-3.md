@@ -51,7 +51,7 @@ This decouples the schema from the rendering work and gives reviewers an easy fi
 
 ## Technical notes
 
-- **Why flat scalars**: `setConfig` does `{ ...DEFAULT_CONFIG, ...config }` (shallow merge) at `src/calendar-card-pro.ts:482`. Nested objects lose their default values when the user provides a partial nested object. This was design-doc bug v2-C1; the fix is "always flat scalars". The existing `weather` field gets a special-case deep-clone in `helpers.ts:346`; we don't add more such cases.
+- **Why flat scalars**: `setConfig` does `{ ...DEFAULT_CONFIG, ...config }` (shallow merge) at `src/calendar-card-pro.ts:478`. Nested objects lose their default values when the user provides a partial nested object. This was design-doc bug v2-C1; the fix is "always flat scalars". The existing `weather` field gets a special-case deep-clone in `helpers.ts:346`; we don't add more such cases.
 - **Validation in `setConfig`**: place the validation block **after** the `{ ...DEFAULT, ...input }` merge but **before** `this.config = mergedConfig`. Reset invalid fields in-place on the merged object, then assign.
 - **Why `Logger.warn` not throw**: existing setConfig is tolerant — it never throws. Matching that style.
 

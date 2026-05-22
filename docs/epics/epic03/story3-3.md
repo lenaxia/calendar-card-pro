@@ -87,7 +87,7 @@ This story is the **final commit before opening the upstream PR.**
   ```
 - [ ] `docs/architecture.md` adds a brief paragraph (~5-8 lines) describing the time-grid view's data flow at the same level of detail as the existing list-view description
 - [ ] No changes to `CONTRIBUTING.md` (process is unchanged)
-- [ ] `RELEASE_NOTES.md` updated with the new feature under the appropriate version heading (likely a new "Unreleased" section if no version is staged)
+- [ ] `docs/RELEASE_NOTES.md` updated with the new feature under the appropriate version heading (likely a new "Unreleased" or next-version section)
 
 ## Out of scope
 
@@ -107,7 +107,7 @@ This story is the **final commit before opening the upstream PR.**
 README.md                            +Time-grid view section (~70 lines)
 docs/architecture.md                 +grid.ts + render-grid.ts in tree, +flow paragraph (~15 lines)
 docs/images/time-grid-view.png       new (placeholder OK; real screenshot in follow-up)
-RELEASE_NOTES.md                     +entry under Unreleased / next version (~10 lines)
+docs/RELEASE_NOTES.md                +entry under Unreleased / next version (~10 lines)
 ```
 
 ## Definition of done

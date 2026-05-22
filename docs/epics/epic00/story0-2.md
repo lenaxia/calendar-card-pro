@@ -29,7 +29,7 @@ The design doc §6.3 specifies a single pure-helper module covering all the non-
   - `chooseVisibleDays(widthPx, bpThreeDayPx, bpSevenDayPx, cap): 1 | 3 | 7` — `widthPx === 0` returns `cap` (no-measurement fallback), real widths use breakpoints
   - `computeEventPlacement(startMin, endMin, gridStartMin, gridEndMin, slotHeightPx, intervalMin, minHeightPx): EventPlacement`
   - `layoutOverlaps<T>(events: T[]): Array<T & { laneIndex, laneCount }>` — cluster-based packing, sorts internally
-  - `splitTimedEventByDay(event, windowStart, windowEnd): CalendarEventData[]` — preserves timed semantics; drops zero-duration segments (events ending exactly at midnight)
+  - `splitTimedEventByDay(event, windowStart, windowEnd): CalendarEventData[]` — preserves timed semantics; drops zero-duration segments (events ending exactly at midnight). **Each returned segment preserves the original event's metadata via spread**: `{...originalEvent, start: { dateTime: segStartIso }, end: { dateTime: segEndIso }}` — only `start` and `end` are replaced; `summary`, `description`, `location`, `_entityId`, `_matchedConfig`, `_entityLabel`, etc. are inherited unchanged.
   - `getReferenceDate(config: Pick<Config, 'start_date' | 'days_to_show'>): Date` — returns local midnight; replicates `events.ts:getStartDateReference` via public `getTimeWindow`
   - `isPastEvent(event: CalendarEventData, now: Date): boolean` — replicates `render.ts:isPastEvent` semantics
   - `formatHourLabel(hour: number, use24h: boolean): string` — `5` → `"5"` or `"5 AM"`, no minutes (axis labels are hour-only)
@@ -62,6 +62,7 @@ The design doc §6.3 specifies a single pure-helper module covering all the non-
 
 ## Technical notes
 
+- **All pure helpers added in this story, even ones epic00 doesn't actively use** (e.g., `chooseVisibleDays` is only consumed by epic01 story1-1, but defined here). Rationale: keeps `utils/grid.ts` cohesive; lets the test suite cover the full helper surface in one place; supports parallel work where another developer can wire up epic01 without touching epic00 code.
 - **DST math**: design doc revision history records this bug (v10-F2). Use `Math.round`, not `Math.floor`.
 - **Cluster algorithm**: sort by `startMin`, walk; while `next.startMin < cluster_max_endMin`, extend cluster; max simultaneous = `laneCount`; greedy lane assignment; transitively-overlapping events share one cluster (G-2.9d in design doc).
 - **Half-open intervals**: events touching at one instant (A ends at 10:00, B starts at 10:00) do NOT overlap (strict `<`).
