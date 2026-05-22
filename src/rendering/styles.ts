@@ -701,4 +701,169 @@ export const cardStyles = css`
       transform: rotate(360deg);
     }
   }
+
+  /* ===== Time-grid view ===== */
+  .ccp-grid {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .ccp-grid-nav {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+  }
+
+  .ccp-grid-nav button {
+    background: transparent;
+    border: none;
+    color: inherit;
+    font: inherit;
+    padding: 2px 6px;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+
+  .ccp-grid-nav button:focus-visible {
+    outline: 2px solid var(--calendar-card-line-color-vertical);
+    outline-offset: 1px;
+  }
+
+  .ccp-grid-nav button[aria-disabled='true'],
+  .ccp-grid-nav button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .ccp-grid-range {
+    margin-inline-start: auto;
+    font-size: var(--calendar-card-font-size-event);
+  }
+
+  .ccp-grid-headers,
+  .ccp-grid-allday {
+    display: grid;
+  }
+
+  .ccp-grid-axis-spacer {
+    width: var(--calendar-card-grid-time-axis-width, 48px);
+  }
+
+  .ccp-grid-day-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 4px 2px;
+    font-size: var(--calendar-card-font-size-weekday);
+    color: var(--calendar-card-color-weekday);
+  }
+
+  .ccp-grid-day-header.today {
+    color: var(--calendar-card-line-color-vertical);
+    font-weight: 600;
+  }
+
+  .ccp-grid-day-header-weekday {
+    font-size: var(--calendar-card-font-size-weekday);
+    line-height: 1.2;
+  }
+
+  .ccp-grid-day-header-daynum {
+    font-size: var(--calendar-card-font-size-day);
+    color: var(--calendar-card-color-day);
+    line-height: 1.2;
+  }
+
+  .ccp-grid-day-header-month {
+    font-size: var(--calendar-card-font-size-month);
+    color: var(--calendar-card-color-month);
+    line-height: 1.2;
+  }
+
+  .ccp-grid-allday {
+    max-height: var(--calendar-card-grid-allday-max-height, 6em);
+    overflow: hidden;
+  }
+
+  .ccp-grid-body {
+    display: grid;
+    grid-template-columns: var(--calendar-card-grid-time-axis-width, 48px) 1fr;
+  }
+
+  .ccp-grid-time-axis {
+    position: relative;
+    font-size: var(--calendar-card-font-size-time);
+    color: var(--calendar-card-color-time);
+  }
+
+  .ccp-grid-hour-label {
+    padding: 2px 4px;
+    text-align: end;
+    line-height: 1;
+  }
+
+  .ccp-grid-columns {
+    display: grid;
+    position: relative;
+  }
+
+  .ccp-grid-day-column {
+    position: relative;
+    min-height: 24px;
+    border-inline-start: 1px solid var(--calendar-card-day-separator-color, transparent);
+  }
+
+  .ccp-grid-day-column.today {
+    background: color-mix(in srgb, var(--calendar-card-line-color-vertical) 4%, transparent);
+  }
+
+  .ccp-grid-event {
+    position: absolute;
+    border-inline-start: 2px solid var(--calendar-card-line-color-vertical);
+    background: var(--calendar-card-line-color-vertical);
+    color: var(--calendar-card-color-event);
+    border-radius: var(--calendar-card-grid-event-radius, 4px);
+    font-size: var(--calendar-card-font-size-event);
+    overflow: hidden;
+    box-sizing: border-box;
+    padding: 2px 4px;
+    line-height: 1.2;
+  }
+
+  .ccp-grid-event.past-event {
+    opacity: 0.55;
+  }
+
+  .ccp-grid-event-title {
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .ccp-grid-event-time {
+    font-size: var(--calendar-card-font-size-time);
+    color: var(--calendar-card-color-time);
+    opacity: 0.9;
+  }
+
+  .ccp-grid-event-location {
+    font-size: var(--calendar-card-font-size-location);
+    color: var(--calendar-card-color-location);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .ccp-grid-hidden-pill {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    right: 2px;
+    font-size: 10px;
+    opacity: 0.7;
+    text-align: center;
+  }
 `;
