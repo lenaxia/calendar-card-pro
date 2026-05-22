@@ -38,6 +38,7 @@ import * as Logger from './utils/logger';
 import * as Styles from './rendering/styles';
 import * as Feedback from './interaction/feedback';
 import * as Render from './rendering/render';
+import * as RenderGrid from './rendering/render-grid';
 import * as Weather from './utils/weather';
 import * as Editor from './rendering/editor';
 
@@ -82,6 +83,8 @@ class CalendarCardPro extends LitElement {
   @property({ attribute: false }) isInitialLoad = true;
   @property({ attribute: false }) isLoading = false;
   @property({ attribute: false }) isExpanded = false;
+  @property({ attribute: false }) viewOffsetDays = 0;
+  @property({ attribute: false }) visibleDays: 1 | 3 | 7 = 7;
   @property({ attribute: false }) weatherForecasts: Types.WeatherForecasts = {
     daily: {},
     hourly: {},
@@ -632,6 +635,25 @@ class CalendarCardPro extends LitElement {
     } else if (!this.safeHass || !this.config.entities.length) {
       // Error state - missing entities
       content = Render.renderCardContent('error', this.effectiveLanguage);
+    } else if (this.config.view === 'time-grid') {
+      content = RenderGrid.renderTimeGrid(
+        this.events,
+        this.config,
+        this.effectiveLanguage,
+        {
+          visibleDays: this.visibleDays,
+          offsetDays: this.viewOffsetDays,
+          now: new Date(),
+          onShiftDay: () => {},
+          onShiftWindow: () => {},
+          onResetToToday: () => {
+            this.viewOffsetDays = 0;
+          },
+          canShiftBack: false,
+          canShiftForward: false,
+        },
+        this.safeHass,
+      );
     } else if (this.events.length === 0) {
       // Even with no events, use the regular groupEventsByDay function
       // which now handles empty API results correctly
