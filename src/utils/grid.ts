@@ -395,6 +395,41 @@ export function formatHourLabel(hour: number, use24h: boolean): string {
   return `${hour - 12} PM`;
 }
 
+/**
+ * Approximate card size in 50px-row units for Home Assistant's masonry view.
+ * Returns 1 for the list view (matches HA's documented default when the
+ * method is not defined). For the time-grid view, sums the visible-band
+ * pixel height (computed from start/end hour, interval, and SLOT_HEIGHT_PX)
+ * plus a small chrome allowance for the nav bar and day headers, then
+ * clamps to `max_height` when it is a px value.
+ */
+export function computeCardSize(
+  config: Pick<
+    Types.Config,
+    | 'view'
+    | 'time_grid_start_hour'
+    | 'time_grid_end_hour'
+    | 'time_grid_interval_minutes'
+    | 'max_height'
+  >,
+): number {
+  if (config.view !== 'time-grid') return 1;
+
+  const slotsPerHour = 60 / config.time_grid_interval_minutes;
+  const gridPx =
+    (config.time_grid_end_hour - config.time_grid_start_hour) * slotsPerHour * SLOT_HEIGHT_PX;
+  const chromePx = 80;
+  let totalPx = gridPx + chromePx;
+
+  const mh = config.max_height;
+  if (mh && mh !== 'none' && mh.endsWith('px')) {
+    const mhPx = parseFloat(mh);
+    if (!isNaN(mhPx)) totalPx = Math.min(totalPx, mhPx);
+  }
+
+  return Math.max(1, Math.ceil(totalPx / 50));
+}
+
 //-----------------------------------------------------------------------------
 // INTERNAL HELPERS
 //-----------------------------------------------------------------------------

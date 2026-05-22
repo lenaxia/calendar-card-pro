@@ -5,6 +5,7 @@ import {
   SLOT_HEIGHT_PX,
   buildDayWindow,
   chooseVisibleDays,
+  computeCardSize,
   computeEventPlacement,
   daysBetween,
   formatHourLabel,
@@ -503,5 +504,38 @@ describe('snapToWindow', () => {
     expect(start.getDate()).toBe(12);
     expect(days).toHaveLength(3);
     expect(days[2].getDate()).toBe(14);
+  });
+});
+
+describe('computeCardSize', () => {
+  const baseGridConfig = {
+    view: 'time-grid' as const,
+    time_grid_start_hour: 6,
+    time_grid_end_hour: 22,
+    time_grid_interval_minutes: 30 as const,
+    max_height: 'none',
+  };
+
+  it('G-getCardSize: list view returns 1', () => {
+    expect(computeCardSize({ ...baseGridConfig, view: 'list' })).toBe(1);
+  });
+
+  it('G-getCardSize: default 06-22 / interval 30 returns 17', () => {
+    expect(computeCardSize(baseGridConfig)).toBe(17);
+  });
+
+  it('G-getCardSize: max_height=400px clamps to 8', () => {
+    expect(computeCardSize({ ...baseGridConfig, max_height: '400px' })).toBe(8);
+  });
+
+  it('G-getCardSize: full-day 00-24 / interval 60 returns 14', () => {
+    expect(
+      computeCardSize({
+        ...baseGridConfig,
+        time_grid_start_hour: 0,
+        time_grid_end_hour: 24,
+        time_grid_interval_minutes: 60,
+      }),
+    ).toBe(14);
   });
 });

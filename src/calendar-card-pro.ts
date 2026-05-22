@@ -33,6 +33,7 @@ import * as Types from './config/types';
 import * as Localize from './translations/localize';
 import * as EventUtils from './utils/events';
 import * as Actions from './interaction/actions';
+import * as Grid from './utils/grid';
 import * as Helpers from './utils/helpers';
 import * as Logger from './utils/logger';
 import * as Styles from './rendering/styles';
@@ -536,6 +537,16 @@ class CalendarCardPro extends LitElement {
 
     // Restart the timer with new config
     this.startRefreshTimer();
+  }
+
+  /**
+   * Approximate card size for Home Assistant's masonry view (in 50px-row units).
+   * List view returns 1 (HA's documented default); time-grid view returns the
+   * height of the visible band plus a small chrome allowance, optionally
+   * clamped to a px-valued `max_height`.
+   */
+  public getCardSize(): number {
+    return Grid.computeCardSize(this.config);
   }
 
   /**
