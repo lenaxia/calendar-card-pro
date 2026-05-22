@@ -442,6 +442,24 @@ export function computeCardSize(
   return Math.max(1, Math.ceil(totalPx / 50));
 }
 
+/**
+ * Compute the offset (in days from the fetch reference) needed to bring today
+ * into the navigable range. Used by the host's onResetToToday handler so
+ * clicking "Today" works even when start_date moves the reference away from
+ * today. Clamps into the valid offset range [0, navigationDays - visibleDays];
+ * a future start_date (today < reference) yields 0 (R-22 in the design doc).
+ */
+export function computeTodayOffset(
+  reference: Date,
+  today: Date,
+  visibleDays: 1 | 3 | 7,
+  navigationDays: number,
+): number {
+  const diffDays = daysBetween(reference, today);
+  const max = Math.max(0, navigationDays - visibleDays);
+  return Math.max(0, Math.min(max, diffDays));
+}
+
 //-----------------------------------------------------------------------------
 // INTERNAL HELPERS
 //-----------------------------------------------------------------------------

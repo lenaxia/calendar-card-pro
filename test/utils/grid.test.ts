@@ -8,6 +8,7 @@ import {
   clampOffset,
   computeCardSize,
   computeEventPlacement,
+  computeTodayOffset,
   daysBetween,
   formatHourLabel,
   getReferenceDate,
@@ -560,5 +561,36 @@ describe('clampOffset', () => {
 
   it('clampOffset(10, 5, 21) returns 15 (within range)', () => {
     expect(clampOffset(10, 5, 21)).toBe(15);
+  });
+});
+
+describe('computeTodayOffset', () => {
+  it('G-Today: start_date="-7" puts today at offset 7', () => {
+    const reference = new Date(2026, 4, 6);
+    const today = new Date(2026, 4, 13);
+    expect(computeTodayOffset(reference, today, 7, 28)).toBe(7);
+  });
+
+  it('reference === today returns 0 (default config)', () => {
+    const today = new Date(2026, 4, 13);
+    expect(computeTodayOffset(today, today, 7, 28)).toBe(0);
+  });
+
+  it('future start_date: today before reference clamps to 0', () => {
+    const reference = new Date(2026, 4, 18);
+    const today = new Date(2026, 4, 13);
+    expect(computeTodayOffset(reference, today, 7, 28)).toBe(0);
+  });
+
+  it('clamps at maxOffset when navigationDays is small', () => {
+    const reference = new Date(2026, 4, 1);
+    const today = new Date(2026, 4, 30);
+    expect(computeTodayOffset(reference, today, 7, 14)).toBe(7);
+  });
+
+  it('respects visibleDays (1-day mode caps at navigationDays - 1)', () => {
+    const reference = new Date(2026, 4, 1);
+    const today = new Date(2026, 4, 30);
+    expect(computeTodayOffset(reference, today, 1, 14)).toBe(13);
   });
 });
