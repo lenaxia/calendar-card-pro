@@ -69,7 +69,7 @@ This is a frequently-requested feature ([#325](https://github.com/alexpfau/calen
     // (1) Midnight detection — runs FIRST, before lineEl null-guard. (Story 2-3 implements this.)
     // For this story: just the position update.
 
-    // (2) Position update
+    // (2) Position update via pure helper Grid.computeNowLineTop
     const lineEl = this.renderRoot.querySelector<HTMLElement>(
       '.ccp-grid-day-column.today .ccp-grid-now-line',
     );
@@ -77,18 +77,21 @@ This is a frequently-requested feature ([#325](https://github.com/alexpfau/calen
 
     const now = new Date();
     const minutes = now.getHours() * 60 + now.getMinutes();
-    const gridStart = this.config.time_grid_start_hour * 60;
-    const gridEnd = this.config.time_grid_end_hour * 60;
-    const slotHeight = Grid.SLOT_HEIGHT_PX;
-    const interval = this.config.time_grid_interval_minutes;
+    const top = Grid.computeNowLineTop(
+      minutes,
+      this.config.time_grid_start_hour * 60,
+      this.config.time_grid_end_hour * 60,
+      Grid.SLOT_HEIGHT_PX,
+      this.config.time_grid_interval_minutes,
+    );
 
-    if (minutes < gridStart || minutes > gridEnd) {
+    if (top === null) {
       lineEl.style.display = 'none';
       return;
     }
 
     lineEl.style.display = '';
-    lineEl.style.top = `${(minutes - gridStart) / interval * slotHeight}px`;
+    lineEl.style.top = `${top}px`;
   }
   ```
 - [ ] `connectedCallback` (after the existing logic from epic01):

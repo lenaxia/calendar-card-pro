@@ -76,7 +76,7 @@ This is the single most important rule. The design doc for the time-grid view we
 
 ```
 Assumption: "setConfig merges shallow via {...DEFAULT, ...config}"
-Verified by: src/calendar-card-pro.ts:482 (read directly)
+Verified by: src/calendar-card-pro.ts:478 (read directly)
 Status: ✅ Verified — this means nested object defaults are LOST when user provides
         a partial nested object. Affected fields must be flat scalars OR get a
         deep-clone special case (see existing `weather` config in helpers.ts:346).
@@ -439,7 +439,7 @@ Same interval detects midnight → calls requestUpdate() to refresh "today" high
 
 The full schema is in `src/config/types.ts`. Critical patterns:
 
-- **Top-level scalar fields only** for new options. Nested objects break due to the shallow-merge bug at `src/calendar-card-pro.ts:482` (`{ ...DEFAULT_CONFIG, ...config }` destroys nested partials). The existing `weather` config sidesteps this with a special-case deep-clone in `helpers.ts:346`; we don't add more such cases.
+- **Top-level scalar fields only** for new options. Nested objects break due to the shallow-merge bug at `src/calendar-card-pro.ts:478` (`{ ...DEFAULT_CONFIG, ...config }` destroys nested partials). The existing `weather` config sidesteps this with a special-case deep-clone in `helpers.ts:346`; we don't add more such cases.
 - **`DEFAULT_CONFIG`** in `src/config/config.ts` — every new field MUST have an entry here so `filterDefaultValues` can omit defaults from saved YAML.
 - **`hasConfigChanged`** in `src/config/config.ts` — controls whether a config change triggers a refetch. Adding a new fetch-affecting field requires updating this function.
 
@@ -477,7 +477,7 @@ CI runs `npm run lint` and `npm run build` on every PR (`.github/workflows/ci.ym
 ### 1. Adding a nested object to Config
 
 ```typescript
-// FORBIDDEN — shallow-merge bug at setConfig:482 will lose nested defaults
+// FORBIDDEN — shallow-merge bug at setConfig:478 will lose nested defaults
 time_grid_breakpoints: { three_day: 500, seven_day: 900 }
 
 // CORRECT — flat scalars

@@ -41,7 +41,14 @@ epic00 emitted placeholder no-op handlers. This story makes them real. The butto
   ```
 - [ ] Renderer (`render-grid.ts`):
   - Buttons fire `ctx.onShiftDay(-1)` / `ctx.onShiftDay(1)` / `ctx.onShiftWindow(-1)` / `ctx.onShiftWindow(1)` / `ctx.onResetToToday()`
-  - Each button has `aria-label` (the 5 navigation strings come in epic03 from translations; placeholder English strings here)
+  - Each button has `aria-label` from translations. **Mapping** (translation keys arrive in epic03 story3-2; in this story, use the keys as both label and fallback so the buttons still work pre-i18n):
+    | Button | Visual | aria-label key | Notes |
+    |---|---|---|---|
+    | Previous window | `«` | `time_grid_prev_window_aria` | Templated `"Previous {n} days"` — replace `{n}` with `String(visibleDays)` at call site |
+    | Previous day | `‹` | `time_grid_prev_day_aria` | Static `"Previous day"` |
+    | Today | `Today` (visible label, not aria-label) | `time_grid_today` | Static `"Today"` |
+    | Next day | `›` | `time_grid_next_day_aria` | Static `"Next day"` |
+    | Next window | `»` | `time_grid_next_window_aria` | Templated `"Next {n} days"` — same {n} substitution |
   - Each button calls `event.stopPropagation()` so it does NOT trigger the card-level `tap_action`
   - Buttons use `aria-disabled="true"` (and visual opacity 0.4 from CSS) when at edge:
     - Back buttons (`<`, `<<`): `aria-disabled` when `!ctx.canShiftBack`

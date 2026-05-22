@@ -30,7 +30,33 @@ Today the time-grid view is YAML-only. This story adds a `view` selector to Core
     ],
   )}
   ```
-- [ ] `days_to_show` (and helper-text) wrapped in conditional, hidden when `view: 'time-grid'`:
+- [ ] **List-view sections that don't apply to grid view are wrapped as whole sections (with their `<h3>` headers and helper-text)**, not individual fields. The existing editor structure at `editor.ts:687-712` has two such sections:
+
+  **"Compact Mode" section** — wrap entirely (does not apply to grid view):
+  ```ts
+  ${this.getConfigValue('view') !== 'time-grid'
+    ? html`
+        <h3>${this._getTranslation('compact_mode')}</h3>
+        <div class="helper-text">${this._getTranslation('compact_mode_note')}</div>
+        ${this.addTextField('compact_days_to_show', this._getTranslation('compact_days_to_show'), 'number')}
+        ${this.addTextField('compact_events_to_show', this._getTranslation('compact_events_to_show'), 'number')}
+        ${this.addBooleanField('compact_events_complete_days', this._getTranslation('compact_events_complete_days'))}
+        <div class="helper-text">${this._getTranslation('compact_events_complete_days_note')}</div>
+      `
+    : nothing}
+  ```
+
+  **"Event Visibility" section** — wrap PARTIALLY. `show_past_events` and `filter_duplicates` apply to grid view too (FR-2.11). Only `show_empty_days` is list-only:
+  ```ts
+  <h3>${this._getTranslation('event_visibility')}</h3>
+  ${this.addBooleanField('show_past_events', this._getTranslation('show_past_events'))}
+  ${this.getConfigValue('view') !== 'time-grid'
+    ? html`${this.addBooleanField('show_empty_days', this._getTranslation('show_empty_days'))}`
+    : nothing}
+  ${this.addBooleanField('filter_duplicates', this._getTranslation('filter_duplicates'))}
+  ```
+
+  **`days_to_show` (and helper-text)** — wrap together as before:
   ```ts
   ${this.getConfigValue('view') !== 'time-grid'
     ? html`
@@ -39,7 +65,8 @@ Today the time-grid view is YAML-only. This story adds a `view` selector to Core
       `
     : nothing}
   ```
-- [ ] `compact_events_to_show`, `compact_days_to_show`, `compact_events_complete_days`, `show_empty_days`, `show_week_numbers` — wrap each in the same `view !== 'time-grid'` conditional. (These are all list-view concepts.)
+
+  **`show_week_numbers`** — wrap as a single field (it's not in a `<h3>` section but in the "Week Numbers" subsection). Defer; not part of this story.
 - [ ] New "Time grid" expansion panel, revealed only when `view === 'time-grid'`. **All numeric fields use `addTextField` with `type='number'` (NOT `addSelectField`)** because:
   - `addSelectField` `options` is typed `Array<{value: string; label: string}>` — TypeScript rejects numeric values
   - `_valueChanged` already handles `type='number'` via `parseFloat` (editor.ts:449-452)
@@ -98,7 +125,7 @@ Today the time-grid view is YAML-only. This story adds a `view` selector to Core
 
 - **`addSelectField`, `addTextField`, `addBooleanField`, `addExpansionPanel`** are existing helpers (verified in editor.ts). Signatures:
   - `addSelectField(name, label, options: Array<{value: string; label: string}>, clearable?, defaultValue?, changeCallback?)` — values are **strings only**. Use `addTextField(... 'number')` for numeric fields.
-  - `addTextField(name, label, type)` — `type` defaults to `'text'`; pass `'number'` for numeric inputs (handled by `_valueChanged` at editor.ts:449-452 via `parseFloat`).
+  - `addTextField(name, label?, type?, defaultValue?)` — `type` defaults to `'text'`; pass `'number'` for numeric inputs (handled by `_valueChanged` at editor.ts:449-452 via `parseFloat`). Optional 4th `defaultValue` arg is rarely needed because `getConfigValue(name)` returns the merged default-config value. Skip the 4th arg unless you specifically want a different fallback in the input box than the merged config value.
   - `addBooleanField(name, label)` — uses `ha-switch`; values handled at editor.ts:445-447.
   - `addExpansionPanel(title, icon, content, expandedByDefault?)` — 4th arg is optional boolean, default `false`.
 - **`getConfigValue('path')`** supports dot notation, but we don't use dot notation here (all flat scalars).

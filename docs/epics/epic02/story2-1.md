@@ -26,9 +26,9 @@ epic00 rendered `.ccp-grid-allday` as an empty placeholder. This story fills it 
 - [ ] `src/config/types.ts` adds:
   ```ts
   time_grid_allday_bg_opacity: number;       // 0..1, default 0.2
-  time_grid_allday_max_height: string;       // CSS length, default '6em'
   ```
-- [ ] `src/config/config.ts` adds matching `DEFAULT_CONFIG` entries
+  *(Note: `--calendar-card-grid-allday-max-height` is a CSS custom property only, not a config field. Card-mod / theme users can override; YAML users cannot. This matches design doc FR-9.2.)*
+- [ ] `src/config/config.ts` adds matching `DEFAULT_CONFIG` entry
 - [ ] `src/rendering/render-grid.ts` `renderTimeGrid` filters all-day events from `events` (`!event.start.dateTime && event.start.date`) and renders them in `.ccp-grid-allday`:
   ```ts
   // For each all-day event:
@@ -48,7 +48,10 @@ epic00 rendered `.ccp-grid-allday` as an empty placeholder. This story fills it 
   const continuesAfter = (originalSpan - clampOffset) > (ctx.visibleDays - dayIdx);
 
   const accentBg = EventUtils.getEntityAccentColorWithOpacity(
-    event._entityId, config, config.time_grid_allday_bg_opacity
+    event._entityId,
+    config,
+    config.time_grid_allday_bg_opacity,
+    event,   // 4th arg: pass event for _matchedConfig fast-path lookup; matches existing render.ts callsite pattern
   );
 
   return html`
@@ -87,7 +90,7 @@ epic00 rendered `.ccp-grid-allday` as an empty placeholder. This story fills it 
   .ccp-grid-allday-banner.past-event { opacity: 0.55; }
   .ccp-grid-allday-overflow { opacity: 0.6; margin: 0 4px; }
   ```
-- [ ] `--calendar-card-grid-allday-max-height` driven by `time_grid_allday_max_height` config — set via inline style on `.ccp-grid-allday` OR via `generateCustomPropertiesObject` (preferred: inline so it doesn't pollute card-mod targeting)
+- [ ] **`--calendar-card-grid-allday-max-height` is a CSS custom property only**, NOT bound to a config field. Default `6em` is built into the CSS rule's `var()` fallback. Users who want to customize do so via card-mod or theme CSS variables.
 - [ ] Test: spec G-2.7a (banner fully within window), G-2.7b (clipped at start, `◂`), G-2.7c (clipped at end, `▸`), G-2.7d (spans entire window, both indicators)
   - These test the placement math in pure helper form. Extract `computeBannerPlacement(eventStart, eventEnd, windowStart, visibleDays)` to `utils/grid.ts` if not already there.
 - [ ] `show_past_events: false` does **NOT** filter all-day past events (FR-2.11 / G-pastEventsFilter). They render with `past-event` class for dimming.
@@ -109,8 +112,8 @@ epic00 rendered `.ccp-grid-allday` as an empty placeholder. This story fills it 
 ## Files touched
 
 ```
-src/config/types.ts                  +2 fields
-src/config/config.ts                 +2 DEFAULT_CONFIG entries
+src/config/types.ts                  +1 field (time_grid_allday_bg_opacity only)
+src/config/config.ts                 +1 DEFAULT_CONFIG entry
 src/rendering/render-grid.ts         banner rendering (~50 lines)
 src/rendering/styles.ts              banner-specific CSS (~25 lines)
 src/utils/grid.ts                    optionally +computeBannerPlacement (~15 lines)

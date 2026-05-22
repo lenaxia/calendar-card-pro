@@ -48,7 +48,7 @@ It also adds the visibility-change pause to avoid background ticking when the ca
 - [ ] `updated(changedProps)` sets `_lastRenderDay` after each render commits (so subsequent ticks use the freshest day):
   ```ts
   // After existing updated() logic:
-  if (this.config.view === 'time-grid') {
+  if (this.config?.view === 'time-grid') {   // optional chaining for early-lifecycle safety
     const d = new Date();
     d.setHours(0, 0, 0, 0);
     this._lastRenderDay = d.getTime();
