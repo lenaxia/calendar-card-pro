@@ -73,7 +73,7 @@ time_grid_allday_bg_opacity: 0.2
 
 - All stories complete with their acceptance criteria met
 - `npm run lint` clean
-- `npm run build` succeeds; cumulative bundle delta (epic00 + epic01 + epic02) ≤ +20 KB minified
+- `npm run build` succeeds; cumulative bundle delta through end of epic02 stays within the design's overall +20 KB budget (final budget verified at end of epic03)
 - `npm test` passes (banner placement specs G-2.7a/b/c/d, now-line specs G-2.10/2.10b, midnight refresh G-midnightRefresh)
 - Manual smoke test 1: multi-day all-day event renders as a banner spanning correct columns
 - Manual smoke test 2: banner extending before/after the visible window shows `◂` or `▸` indicator and is clipped to the window edges

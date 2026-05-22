@@ -25,9 +25,11 @@ This story is the **final commit before opening the upstream PR.**
 
 ## Acceptance criteria
 
-- [ ] `README.md` adds a new section `### Time-grid view` (placed after the existing `### List view` section if there is one, or in the natural location based on existing structure):
+- [ ] `README.md` adds a new section `### Time-Grid View` placed under **"5️⃣ Features & Configuration"**, after the existing "Layout & Appearance" subsection (so it sits naturally with other view-related features). The section briefly explains the feature with one example config and a screenshot, but does NOT duplicate the full options table — those belong in section 6.
+
+  Structure (~30-40 lines):
   ```markdown
-  ### Time-grid view
+  ### 🕒 Time-Grid View
 
   A Google-Calendar–style view that places timed events on a 2-D plane:
   vertical = time of day, horizontal = days. Responsive: 1 column on mobile,
@@ -39,42 +41,41 @@ This story is the **final commit before opening the upstream PR.**
   type: custom:calendar-card-pro
   entities: [calendar.work, calendar.personal]
   view: time-grid
-  time_grid_start_hour: 6
-  time_grid_end_hour: 22
-  time_grid_interval_minutes: 30
   time_grid_navigation_days: 28
-  time_grid_show_now_line: true
   ```
 
   ![Time-grid view screenshot](docs/images/time-grid-view.png)
 
-  **Configuration options:**
-
-  | Option | Type | Default | Description |
-  |---|---|---|---|
-  | `view` | `'list' \| 'time-grid'` | `'list'` | Which layout to render |
-  | `time_grid_start_hour` | `number` | `6` | First hour shown on the time axis (0-23) |
-  | `time_grid_end_hour` | `number` | `22` | Last hour shown on the time axis (1-24) |
-  | `time_grid_interval_minutes` | `15 \| 30 \| 60` | `30` | Time between grid rows |
-  | `time_grid_event_min_height_px` | `number` | `24` | Minimum height for short events (px) |
-  | `time_grid_max_days` | `1 \| 3 \| 7` | `7` | Maximum visible columns (caps responsive switching) |
-  | `time_grid_navigation_days` | `number` | `28` | How many days of events to fetch (drives `<<` `>>` range) |
-  | `time_grid_breakpoint_three_day_px` | `number` | `500` | Width below which 1-column view is used |
-  | `time_grid_breakpoint_seven_day_px` | `number` | `900` | Width above which 7-column view is used |
-  | `time_grid_show_now_line` | `boolean` | `true` | Show a live "current time" indicator on today's column |
-  | `time_grid_allday_bg_opacity` | `number` | `0.2` | Opacity of all-day banner backgrounds (0-1) |
-
   **Navigation**: `<<` `<` `Today` `>` `>>` buttons let you scroll forward/backward.
-  At 7-day width, `<` `>` are hidden (window snaps to weeks; single-day shifts have no effect).
-  At 1-day width, `<<` `>>` are hidden (they'd duplicate `<` `>`).
+  At 7-day width, `<` `>` are hidden (window snaps to weeks). At 1-day width,
+  `<<` `>>` are hidden.
 
   **Notes:**
-  - `view: 'time-grid'` is independent of `days_to_show`. The grid uses `time_grid_navigation_days`; `days_to_show` only applies to list view.
-  - Events display in the browser's local timezone, not Home Assistant's. Cross-timezone setups may show events at unexpected times.
-  - All-day events render as banners across the top of the grid; timed events are positioned at their start time.
-  - `tap_action: 'expand'` (default for list view's compact mode) is a no-op in grid view.
+  - `view: 'time-grid'` is independent of `days_to_show`. Grid uses
+    `time_grid_navigation_days`; `days_to_show` only applies to list view.
+  - Events display in the browser's local timezone, not Home Assistant's.
+  - All-day events render as banners across the top.
+  - `tap_action: 'expand'` is a no-op in grid view.
+
+  See section 6 below for the full list of `time_grid_*` configuration options.
   ```
 - [ ] Screenshot file: a placeholder is acceptable for the PR (e.g., `docs/images/time-grid-view.png` could be a simple text "Screenshot pending" PNG, or omit the image line if no placeholder works in markdown). A real screenshot can be added in a follow-up doc PR. **Don't block this story on a perfect screenshot.**
+- [ ] **`README.md` section 6 (Configuration Variables) gets a new section row** for time-grid options. The existing table has section markers like `**Core Settings**`, `**Layout and Spacing**`, `**Today Indicator**`, etc. Add a new section marker `**Time-Grid View**` with rows for each new field:
+  ```markdown
+  | **Time-Grid View**                         |                   |                                                    |                                                                                                                                |
+  | `view`                                     | string            | `list`                                             | View mode: `list` (default) or `time-grid` (Google-Calendar-style)                                                             |
+  | `time_grid_start_hour`                     | number            | `6`                                                | First hour on the time axis (0-23)                                                                                             |
+  | `time_grid_end_hour`                       | number            | `22`                                               | Last hour on the time axis (1-24, must be > start)                                                                             |
+  | `time_grid_interval_minutes`               | number            | `30`                                               | Slot interval — allowed: 15, 30, 60                                                                                            |
+  | `time_grid_event_min_height_px`            | number            | `24`                                               | Minimum event block height in pixels                                                                                           |
+  | `time_grid_max_days`                       | number            | `7`                                                | Max visible columns — allowed: 1, 3, 7                                                                                         |
+  | `time_grid_navigation_days`                | number            | `28`                                               | Days of events fetched for grid view (independent of `days_to_show`)                                                           |
+  | `time_grid_breakpoint_three_day_px`        | number            | `500`                                              | Width below which 1-column view is used                                                                                        |
+  | `time_grid_breakpoint_seven_day_px`        | number            | `900`                                              | Width above which 7-column view is used                                                                                        |
+  | `time_grid_show_now_line`                  | boolean           | `true`                                             | Show a live "current time" line on today's column                                                                              |
+  | `time_grid_allday_bg_opacity`              | number            | `0.2`                                              | Opacity of all-day banner backgrounds (0-1)                                                                                    |
+  ```
+  Insert after the `**Cache and Refresh**` section in the existing table to keep it as the last new section.
 - [ ] `docs/architecture.md` directory tree updated to include:
   ```
   src/

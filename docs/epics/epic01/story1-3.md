@@ -46,17 +46,7 @@ This story uses `snapToWindow` and adds `_todayOffset()` to fix both.
   ```ts
   onResetToToday: () => { this.viewOffsetDays = this._todayOffset(); }
   ```
-- [ ] `render-grid.ts` uses `snapToWindow` to compute the visible-day list:
-  ```ts
-  const firstDayOfWeek = FormatUtils.getFirstDayOfWeek(config, hass) as 0 | 1;
-  const reference = Grid.getReferenceDate(config);
-  const { start: windowStart, days } = Grid.snapToWindow(
-    reference, ctx.offsetDays, ctx.visibleDays, firstDayOfWeek
-  );
-  // 'days' is the array of N midnight Dates that become the day-columns
-  ```
-- [ ] Day-column headers iterate over `days` (not over a manually-constructed range)
-- [ ] `todayIdx` computed via `daysBetween(windowStart, today)` and clamped to `[0, visibleDays - 1]` or `-1` if today not in `days`
+- [ ] **No changes to `render-grid.ts` in this story** — epic00 story0-4 already calls `Grid.snapToWindow(reference, ctx.offsetDays, ctx.visibleDays, firstDayOfWeek)` and uses its `days` array for column construction. The week-aligned vs rolling logic lives inside `snapToWindow` itself (epic00 story0-2). This story's only renderer-side dependency is that `snapToWindow` MUST snap to week boundaries when `dayCount === 7` — verified in story0-2's spec G-5.1.
 - [ ] When N = 7: window snaps to the start of the user's week (Mon or Sun per `first_day_of_week`); offset shifts move the window by 7 days at a time even when single-step buttons fire `_shiftDays(1)` because `snapToWindow` re-snaps to the week boundary (single-step `<` `>` in N=7 mode are already hidden per story1-1, so this is mostly a defensive correctness check)
 - [ ] When N ∈ {1, 3}: window starts at `reference + offsetDays` (rolling)
 - [ ] `Today` button works correctly with non-today `start_date`:
@@ -88,11 +78,12 @@ This story uses `snapToWindow` and adds `_todayOffset()` to fix both.
 ## Files touched
 
 ```
-src/calendar-card-pro.ts         +1 method (_todayOffset, ~10 lines)
-src/rendering/render-grid.ts     swap manual day construction for snapToWindow (~10 lines net)
+src/calendar-card-pro.ts         +1 method (_todayOffset, ~10 lines); update onResetToToday handler
 src/utils/grid.ts                +computeTodayOffset extraction (~5 lines)
 test/utils/grid.test.ts          +G-Today test cases (~20 lines)
 ```
+
+(no changes to `src/rendering/render-grid.ts` — story0-4 already wires `snapToWindow`)
 
 ## Definition of done
 

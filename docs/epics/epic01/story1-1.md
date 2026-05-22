@@ -35,10 +35,19 @@ epic00 hard-coded `visibleDays = 7`. This story makes it responsive via `ResizeO
 - [ ] New private method `_syncObserver()`:
   - When `config.view === 'time-grid'` and `this.isConnected`: create observer if not present, observe `this`
   - Otherwise: disconnect observer if present
-- [ ] New private method `_onResize(entries)`:
+- [ ] New private method `_onResize()`:
   - Coalesce via `requestAnimationFrame` (skip if `_resizeRafId !== undefined`)
-  - In RAF: read `entries[0]?.contentBoxSize?.[0]?.inlineSize ?? entries[0]?.contentRect.width ?? this.offsetWidth`
+  - In RAF: read **`this.offsetWidth`** directly — simpler and always reflects the current measurement (avoids closure-staleness if multiple ResizeObserver entries arrive between RAF schedule and execution). The `entries` argument from ResizeObserver is unused.
   - Call `_applyVisibleDays(widthPx)`
+  ```ts
+  private _onResize(): void {
+    if (this._resizeRafId !== undefined) return;
+    this._resizeRafId = requestAnimationFrame(() => {
+      this._resizeRafId = undefined;
+      this._applyVisibleDays(this.offsetWidth);
+    });
+  }
+  ```
 - [ ] New private method `_applyVisibleDays(widthPx)`:
   - Calls `Grid.chooseVisibleDays(widthPx, config.time_grid_breakpoint_three_day_px, config.time_grid_breakpoint_seven_day_px, config.time_grid_max_days)`
   - Updates `this.visibleDays` only if the value changed (avoids unnecessary re-renders)
