@@ -121,6 +121,30 @@ export function buildDayWindow(from: Date, dayCount: number): Date[] {
   return out;
 }
 
+/**
+ * Snaps a reference Date and offset to a coherent window of `dayCount`
+ * consecutive local-midnight Dates. For `dayCount === 7`, the window's start
+ * is week-aligned to `firstDayOfWeek`. For other dayCount values, the window
+ * is a rolling range starting at `reference + offsetDays`.
+ *
+ * @param reference - base date; normalized to local midnight
+ * @param offsetDays - signed day offset added to reference
+ * @param dayCount - 1, 3, or 7 columns
+ * @param firstDayOfWeek - 0 (Sunday) or 1 (Monday); only used for dayCount === 7
+ * @returns local-midnight `start` and array of `dayCount` local-midnight Dates
+ */
+export function snapToWindow(
+  reference: Date,
+  offsetDays: number,
+  dayCount: 1 | 3 | 7,
+  firstDayOfWeek: 0 | 1,
+): { start: Date; days: Date[] } {
+  const base = startOfDay(reference);
+  base.setDate(base.getDate() + offsetDays);
+  const start = dayCount === 7 ? startOfWeek(base, firstDayOfWeek) : base;
+  return { start, days: buildDayWindow(start, dayCount) };
+}
+
 //-----------------------------------------------------------------------------
 // RESPONSIVE LAYOUT
 //-----------------------------------------------------------------------------

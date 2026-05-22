@@ -12,6 +12,7 @@ import {
   isPastEvent,
   layoutOverlaps,
   minutesFromMidnight,
+  snapToWindow,
   splitTimedEventByDay,
   startOfDay,
   startOfWeek,
@@ -441,5 +442,66 @@ describe('formatHourLabel', () => {
 
   it('G-hourLabel: formatHourLabel(23, false) === "11 PM"', () => {
     expect(formatHourLabel(23, false)).toBe('11 PM');
+  });
+});
+
+describe('snapToWindow', () => {
+  const expectMidnight = (d: Date): void => {
+    expect(d.getHours()).toBe(0);
+    expect(d.getMinutes()).toBe(0);
+    expect(d.getSeconds()).toBe(0);
+    expect(d.getMilliseconds()).toBe(0);
+  };
+
+  it('G-5.1: aligns Wed reference to Mon when firstDayOfWeek=1, dayCount=7', () => {
+    const ref = new Date(2026, 4, 13);
+    const { start, days } = snapToWindow(ref, 0, 7, 1);
+    expect(start.getFullYear()).toBe(2026);
+    expect(start.getMonth()).toBe(4);
+    expect(start.getDate()).toBe(11);
+    expectMidnight(start);
+    expect(days).toHaveLength(7);
+    days.forEach(expectMidnight);
+  });
+
+  it('G-5.1b: already-aligned Mon reference is unchanged when firstDayOfWeek=1, dayCount=7', () => {
+    const ref = new Date(2026, 4, 11);
+    const { start } = snapToWindow(ref, 0, 7, 1);
+    expect(start.getDate()).toBe(11);
+    expect(start.getMonth()).toBe(4);
+    expect(start.getFullYear()).toBe(2026);
+  });
+
+  it('G-5.2: rolling 3-day window applies offset without week alignment', () => {
+    const ref = new Date(2026, 4, 13);
+    const { start, days } = snapToWindow(ref, 2, 3, 1);
+    expect(start.getDate()).toBe(15);
+    expect(start.getMonth()).toBe(4);
+    expectMidnight(start);
+    expect(days).toHaveLength(3);
+    expect(days[2].getDate()).toBe(17);
+  });
+
+  it('Sunday-aligned 7-day window: Wed reference snaps to preceding Sunday', () => {
+    const ref = new Date(2026, 4, 13);
+    const { start, days } = snapToWindow(ref, 0, 7, 0);
+    expect(start.getDate()).toBe(10);
+    expect(start.getMonth()).toBe(4);
+    expect(days[0].getDay()).toBe(0);
+  });
+
+  it('1-day window: dayCount=1 yields a window starting at the reference', () => {
+    const ref = new Date(2026, 4, 13);
+    const { start, days } = snapToWindow(ref, 0, 1, 1);
+    expect(start.getDate()).toBe(13);
+    expect(days).toHaveLength(1);
+  });
+
+  it('Negative offset: rolling 3-day window starts one day before reference', () => {
+    const ref = new Date(2026, 4, 13);
+    const { start, days } = snapToWindow(ref, -1, 3, 1);
+    expect(start.getDate()).toBe(12);
+    expect(days).toHaveLength(3);
+    expect(days[2].getDate()).toBe(14);
   });
 });
