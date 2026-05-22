@@ -133,6 +133,14 @@ export const DEFAULT_CONFIG: Types.Config = {
     },
   },
 
+  // Time-grid view
+  view: 'list',
+  time_grid_start_hour: 6,
+  time_grid_end_hour: 22,
+  time_grid_interval_minutes: 30,
+  time_grid_event_min_height_px: 24,
+  time_grid_show_now_line: true,
+
   // Actions
   tap_action: { action: 'none' },
   hold_action: { action: 'none' },

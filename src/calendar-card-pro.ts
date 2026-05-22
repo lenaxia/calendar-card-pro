@@ -485,6 +485,34 @@ class CalendarCardPro extends LitElement {
     // END OF DEPRECATED PARAMETERS HANDLING
     //============================================================================
 
+    // Coerce invalid time-grid config to safe defaults so downstream consumers
+    // (instanceId, hasConfigChanged, render dispatch) only see valid values.
+    if (mergedConfig.view !== 'list' && mergedConfig.view !== 'time-grid') {
+      Logger.warn(`Invalid view '${mergedConfig.view}', falling back to 'list'`);
+      mergedConfig.view = 'list';
+    }
+
+    const sh = mergedConfig.time_grid_start_hour;
+    const eh = mergedConfig.time_grid_end_hour;
+    if (
+      !Number.isInteger(sh) ||
+      sh < 0 ||
+      sh > 23 ||
+      !Number.isInteger(eh) ||
+      eh < 1 ||
+      eh > 24 ||
+      sh >= eh
+    ) {
+      Logger.warn(`Invalid hour range start=${sh}, end=${eh}; resetting to defaults`);
+      mergedConfig.time_grid_start_hour = 6;
+      mergedConfig.time_grid_end_hour = 22;
+    }
+
+    if (![15, 30, 60].includes(mergedConfig.time_grid_interval_minutes)) {
+      Logger.warn(`Invalid interval ${mergedConfig.time_grid_interval_minutes}; using 30`);
+      mergedConfig.time_grid_interval_minutes = 30;
+    }
+
     this.config = mergedConfig;
     this.config.entities = Config.normalizeEntities(this.config.entities);
 

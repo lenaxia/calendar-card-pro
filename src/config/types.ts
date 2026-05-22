@@ -109,6 +109,20 @@ export interface Config {
   // Weather
   weather?: WeatherConfig;
 
+  // Time-grid view
+  /** View mode discriminator. `'list'` renders the existing list view; `'time-grid'` renders the Google-Calendar-style time-grid view. */
+  view: 'list' | 'time-grid';
+  /** First hour visible on the time-grid (0..23, inclusive). Must be < `time_grid_end_hour`. */
+  time_grid_start_hour: number;
+  /** Last hour visible on the time-grid (1..24, inclusive end-of-day = 24). Must be > `time_grid_start_hour`. */
+  time_grid_end_hour: number;
+  /** Vertical slot granularity in minutes. One of 15, 30, or 60. */
+  time_grid_interval_minutes: 15 | 30 | 60;
+  /** Minimum rendered height in pixels for any event chip on the grid, regardless of duration. */
+  time_grid_event_min_height_px: number;
+  /** Whether to draw the horizontal "now" indicator line on the grid for the current day. */
+  time_grid_show_now_line: boolean;
+
   // Actions
   tap_action: ActionConfig;
   hold_action: ActionConfig;
