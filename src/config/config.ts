@@ -140,6 +140,9 @@ export const DEFAULT_CONFIG: Types.Config = {
   time_grid_interval_minutes: 30,
   time_grid_event_min_height_px: 24,
   time_grid_show_now_line: true,
+  time_grid_max_days: 7,
+  time_grid_breakpoint_three_day_px: 500,
+  time_grid_breakpoint_seven_day_px: 900,
 
   // Actions
   tap_action: { action: 'none' },

@@ -111,6 +111,9 @@ class CalendarCardPro extends LitElement {
   private _weatherSetupVersion = 0;
   private _weatherSetupPending = false;
 
+  private _resizeObserver?: ResizeObserver;
+  private _resizeRafId?: number;
+
   // Interaction state
   private _activePointerId: number | null = null;
   private _holdTriggered = false;
@@ -183,6 +186,11 @@ class CalendarCardPro extends LitElement {
 
     // Set up visibility listener
     document.addEventListener('visibilitychange', this._handleVisibilityChange);
+
+    this._syncObserver();
+    if (this.config.view === 'time-grid') {
+      this._applyVisibleDays(this.offsetWidth);
+    }
   }
 
   disconnectedCallback() {
@@ -219,6 +227,15 @@ class CalendarCardPro extends LitElement {
     // Remove listeners
     document.removeEventListener('visibilitychange', this._handleVisibilityChange);
 
+    if (this._resizeObserver) {
+      this._resizeObserver.disconnect();
+      this._resizeObserver = undefined;
+    }
+    if (this._resizeRafId !== undefined) {
+      cancelAnimationFrame(this._resizeRafId);
+      this._resizeRafId = undefined;
+    }
+
     Logger.debug('Component disconnected');
   }
 
@@ -246,6 +263,13 @@ class CalendarCardPro extends LitElement {
 
     if (hassJustAvailable || weatherConfigChanged) {
       this._scheduleWeatherSetup();
+    }
+
+    if (changedProps.has('config')) {
+      this._syncObserver();
+      if (this.config.view === 'time-grid') {
+        this._applyVisibleDays(this.offsetWidth);
+      }
     }
   }
 
@@ -379,6 +403,38 @@ class CalendarCardPro extends LitElement {
       }
     });
     this._weatherUnsubscribers = [];
+  }
+
+  private _syncObserver(): void {
+    const wantObserver = this.config.view === 'time-grid' && this.isConnected;
+    if (wantObserver && !this._resizeObserver) {
+      // Arrow function preserves `this` when ResizeObserver invokes the callback.
+      this._resizeObserver = new ResizeObserver(() => this._onResize());
+      this._resizeObserver.observe(this);
+    } else if (!wantObserver && this._resizeObserver) {
+      this._resizeObserver.disconnect();
+      this._resizeObserver = undefined;
+    }
+  }
+
+  private _onResize(): void {
+    if (this._resizeRafId !== undefined) return;
+    this._resizeRafId = requestAnimationFrame(() => {
+      this._resizeRafId = undefined;
+      this._applyVisibleDays(this.offsetWidth);
+    });
+  }
+
+  private _applyVisibleDays(widthPx: number): void {
+    const next = Grid.chooseVisibleDays(
+      widthPx,
+      this.config.time_grid_breakpoint_three_day_px,
+      this.config.time_grid_breakpoint_seven_day_px,
+      this.config.time_grid_max_days,
+    );
+    if (next !== this.visibleDays) {
+      this.visibleDays = next;
+    }
   }
 
   /**

@@ -122,6 +122,12 @@ export interface Config {
   time_grid_event_min_height_px: number;
   /** Whether to draw the horizontal "now" indicator line on the grid for the current day. */
   time_grid_show_now_line: boolean;
+  /** Maximum number of day columns the grid will render at any width. The responsive width-based selection picks 1, 3, or 7 up to this cap. */
+  time_grid_max_days: 1 | 3 | 7;
+  /** Minimum host width in pixels at which the grid promotes from 1-day to 3-day layout. */
+  time_grid_breakpoint_three_day_px: number;
+  /** Minimum host width in pixels at which the grid promotes from 3-day to 7-day layout. */
+  time_grid_breakpoint_seven_day_px: number;
 
   // Actions
   tap_action: ActionConfig;

@@ -15,7 +15,7 @@
 
 ## Why this is needed
 
-epic00 emitted placeholder no-op handlers. This story makes them real. The button visibility (which buttons appear at N=1 vs N=3 vs N=7) was already handled in story1-1; this story wires the click handlers.
+epic00 emitted placeholder no-op handlers and a renderer with only a `Today` button (no `<`/`>`/`«`/`»` buttons existed yet). Story 1-1 added the responsive `visibleDays` reactive prop and lifecycle but deferred the actual nav buttons (since there was nothing to gate). This story adds those buttons WITH the `visibleDays !== 7` guard built in (FR-4.1: 7-day mode shows only `«` `Today` `»`) AND wires the click handlers to real `_shiftDays` logic.
 
 ## Acceptance criteria
 
