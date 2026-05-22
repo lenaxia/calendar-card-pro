@@ -518,7 +518,25 @@ const days = Math.floor((b.getTime() - a.getTime()) / 86400000);
 const days = Math.round((b.getTime() - a.getTime()) / 86400000);
 ```
 
-### 5. Using inline comments to restate code
+### 5. Passing a class method directly to `new ResizeObserver(...)` (loses `this`)
+
+```typescript
+// WRONG — `this` is lost when the observer invokes the callback;
+// at runtime the callback runs with this === undefined and crashes on `this.foo`
+this._resizeObserver = new ResizeObserver(this._onResize);
+
+// CORRECT — arrow function captures lexical `this`
+this._resizeObserver = new ResizeObserver(() => this._onResize());
+
+// ALSO CORRECT — explicit bind
+this._resizeObserver = new ResizeObserver(this._onResize.bind(this));
+```
+
+This applies to ANY browser API that takes a callback — `setTimeout`, `setInterval`,
+`addEventListener`, `MutationObserver`, etc. Always wrap with `() =>` or `.bind(this)`
+when passing class methods.
+
+### 6. Using inline comments to restate code
 
 ```typescript
 // FORBIDDEN
@@ -528,23 +546,23 @@ const start = config.time_grid_start_hour;  // get start hour
 const start = config.time_grid_start_hour;
 ```
 
-### 6. Adding `any` to a function signature
+### 7. Adding `any` to a function signature
 
 ESLint will reject it. Use concrete types or `unknown` with narrowing.
 
-### 7. Targeting the wrong PR base branch
+### 8. Targeting the wrong PR base branch
 
 Per CONTRIBUTING.md, PRs target `dev`, not `main`. Verify before opening.
 
-### 8. Committing `package-lock.json` from `npm install` alone
+### 9. Committing `package-lock.json` from `npm install` alone
 
 If you didn't change `package.json`, revert the `package-lock.json` change before committing.
 
-### 9. Trusting a previous session's notes without re-verifying
+### 10. Trusting a previous session's notes without re-verifying
 
 The source has changed since you last looked. Re-read it.
 
-### 10. Skipping the assumption-validation step
+### 11. Skipping the assumption-validation step
 
 Before designing or implementing, list every assumption in a table. Verify each. Mark uncertain ones explicitly. Don't proceed on unvalidated assumptions.
 

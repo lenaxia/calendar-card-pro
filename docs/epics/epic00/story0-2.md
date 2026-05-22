@@ -33,7 +33,6 @@ The design doc §6.3 specifies a single pure-helper module covering all the non-
   - `getReferenceDate(config: Pick<Config, 'start_date' | 'days_to_show'>): Date` — returns local midnight; replicates `events.ts:getStartDateReference` via public `getTimeWindow`
   - `isPastEvent(event: CalendarEventData, now: Date): boolean` — replicates `render.ts:isPastEvent` semantics
   - `formatHourLabel(hour: number, use24h: boolean): string` — `5` → `"5"` or `"5 AM"`, no minutes (axis labels are hour-only)
-  - `computeCardSize(config: Pick<Config, 'view' | 'time_grid_start_hour' | 'time_grid_end_hour' | 'time_grid_interval_minutes' | 'max_height'>): number` — used by host's `getCardSize()` (story0-7); returns `1` for list view (HA documented default), grid-pixel-based row count for time-grid
 
 - [ ] All functions have JSDoc explicitly stating midnight-normalization where relevant (per AGENTS.md "Validate assumptions; document contracts")
 - [ ] `test/utils/grid.test.ts` covers (minimum):
@@ -49,7 +48,8 @@ The design doc §6.3 specifies a single pure-helper module covering all the non-
   - `getReferenceDate`: 4 cases
   - `isPastEvent`: 4 cases (timed past, timed future, all-day past, all-day future)
   - `formatHourLabel`: 4 cases (24h hour 0, 24h hour 13, 12h hour 0 → "12 AM", 12h hour 12 → "12 PM")
-  - `computeCardSize`: 4 cases (defined in story0-7 — list view → 1; default 06-22/30-min → 17; with max_height='400px' → 8; full 24h/60-min → 14)
+
+*Note: additional pure helpers added in later stories (e.g., `computeNowLineTop` in story2-2, `computeBannerPlacement` in story2-1, `hasDayChanged` in story2-3, `computeCardSize` in story0-7) are NOT implemented here — each is added by its consumer story. This story sets up the foundational helpers for epic00.*
 - [ ] All tests written **before** the implementation (TDD — commit history should show red-then-green ideally; if squashed, commit message references TDD discipline)
 - [ ] All tests pass (`npm test`)
 - [ ] No `any` types (lint-enforced)

@@ -3,7 +3,7 @@
 **Epic**: [epic00 — Time-Grid Base View](README.md)
 **Status**: Not started
 **Estimate**: S (small — ~30 min)
-**Depends on**: [story0-3](story0-3.md) (uses config fields)
+**Depends on**: [story0-2](story0-2.md) (`utils/grid.ts` exists; `SLOT_HEIGHT_PX` exported), [story0-3](story0-3.md) (uses config fields)
 
 ---
 
