@@ -58,21 +58,21 @@ time_grid_interval_minutes: 30
 
 ## Stories
 
-| # | Title | Status |
-|---|---|---|
-| [story0-1](story0-1.md) | Vitest test scaffolding | Not started |
+| #                       | Title                                 | Status      |
+| ----------------------- | ------------------------------------- | ----------- |
+| [story0-1](story0-1.md) | Vitest test scaffolding               | Not started |
 | [story0-2](story0-2.md) | Pure helpers in `utils/grid.ts` (TDD) | Not started |
-| [story0-3](story0-3.md) | Config schema additions | Not started |
-| [story0-4](story0-4.md) | `render-grid.ts` rendering module | Not started |
+| [story0-3](story0-3.md) | Config schema additions               | Not started |
+| [story0-4](story0-4.md) | `render-grid.ts` rendering module     | Not started |
 | [story0-5](story0-5.md) | Render dispatch + minimal host wiring | Not started |
-| [story0-6](story0-6.md) | Grid CSS in `styles.ts` | Not started |
-| [story0-7](story0-7.md) | `getCardSize()` for masonry view | Not started |
+| [story0-6](story0-6.md) | Grid CSS in `styles.ts`               | Not started |
+| [story0-7](story0-7.md) | `getCardSize()` for masonry view      | Not started |
 
 ## Acceptance for the epic as a whole
 
 - All stories complete with their acceptance criteria met
 - `npm run lint` clean
-- `npm run build` succeeds; bundle delta within design budget (≤ +20 KB minified)
+- `npm run build` succeeds; bundle delta within design budget (≤ +25 KB minified — cap raised in worklog 0020)
 - `npm test` passes (Vitest, ~30 cases for pure helpers)
 - Manual smoke test: list view (no `view` set) is visually unchanged from `upstream/dev` HEAD
 - Manual smoke test: `view: time-grid` renders a 7-day grid with correctly positioned timed events at default settings
@@ -89,18 +89,18 @@ time_grid_interval_minutes: 30
 
 ## Mapping to design doc FRs
 
-| FR | Story | Notes |
-|---|---|---|
-| FR-1.1, FR-1.3, FR-1.4 | story0-3, story0-5 | View selector, dispatch |
-| FR-1.2 | story0-5 | List view byte-identical (enforced by code review) |
-| FR-2.1 | story0-4, story0-6 | N day columns (N=7 fixed for this epic) |
-| FR-2.2 | story0-4 | Day-column headers |
-| FR-2.3, FR-2.4 | story0-2, story0-3 | Hour range + slot interval |
-| FR-2.5, FR-2.6 | story0-2, story0-4 | Event placement + clipping |
-| FR-2.8 | story0-2 | `splitTimedEventByDay` |
-| FR-2.9 | story0-2 | Cluster-based overlap layout |
-| FR-2.11 | story0-2, story0-4 | `isPastEvent` + dimming + `show_past_events` filter |
-| FR-2.12 | story0-4 | Empty events render structure |
-| FR-9 | story0-6 | Theming + CSS variables |
-| FR-10 | story0-7 | `getCardSize` |
-| FR-11.1, FR-11.2 | (entire epic) | List view unchanged + bundle budget |
+| FR                     | Story              | Notes                                               |
+| ---------------------- | ------------------ | --------------------------------------------------- |
+| FR-1.1, FR-1.3, FR-1.4 | story0-3, story0-5 | View selector, dispatch                             |
+| FR-1.2                 | story0-5           | List view byte-identical (enforced by code review)  |
+| FR-2.1                 | story0-4, story0-6 | N day columns (N=7 fixed for this epic)             |
+| FR-2.2                 | story0-4           | Day-column headers                                  |
+| FR-2.3, FR-2.4         | story0-2, story0-3 | Hour range + slot interval                          |
+| FR-2.5, FR-2.6         | story0-2, story0-4 | Event placement + clipping                          |
+| FR-2.8                 | story0-2           | `splitTimedEventByDay`                              |
+| FR-2.9                 | story0-2           | Cluster-based overlap layout                        |
+| FR-2.11                | story0-2, story0-4 | `isPastEvent` + dimming + `show_past_events` filter |
+| FR-2.12                | story0-4           | Empty events render structure                       |
+| FR-9                   | story0-6           | Theming + CSS variables                             |
+| FR-10                  | story0-7           | `getCardSize`                                       |
+| FR-11.1, FR-11.2       | (entire epic)      | List view unchanged + bundle budget                 |

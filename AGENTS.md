@@ -41,6 +41,7 @@ HA_DEV_DOCS    = https://developers.home-assistant.io/docs/frontend/custom-ui/cu
 **Format**: `NNNN_YYYY-MM-DD_description.md` in `docs/design/`
 
 **Get the next sequence number:**
+
 ```bash
 cd docs/design
 NEXT=$(printf "%04d" $(($(ls -1 [0-9][0-9][0-9][0-9]_*.md 2>/dev/null | sed 's/_.*//' | sort -n | tail -1) + 1)))
@@ -64,6 +65,7 @@ This is the single most important rule. The design doc for the time-grid view we
 4. When uncertain, **say so explicitly** with a confidence level (LOW/MEDIUM/HIGH) and ask
 
 **Forbidden patterns:**
+
 ```
 "This must be the way it works because…"           [trust no inference]
 "I think the existing code does X"                 [verify by reading]
@@ -87,20 +89,24 @@ Status: ✅ Verified — this means nested object defaults are LOST when user pr
 **Every assertion in design docs, code comments, work logs, or PR descriptions must be backed by code, citation, or empirical test.**
 
 **If you claim X exists:**
+
 - Show the file path and line number where X is defined
 - Show the actual source text, obtained by reading the file or running grep
 
 **If you claim X does not exist:**
+
 - Show the grep/search command and its (empty) output as proof of absence
 - Search **all** plausible locations — `src/`, `node_modules/lit/`, the rollup output, etc.
 - Absence from one file does not mean absence from all files
 
 **If you claim X behaves a certain way:**
+
 - Cite the specification (HA docs, MDN, Lit docs) OR
 - Show the actual code that implements the behavior OR
 - Run a test that demonstrates it
 
 **Forbidden patterns** — never write these without proof:
+
 ```
 "There is no API for this"
 "Lit's @property always triggers a re-render"        [verify identity check semantics]
@@ -116,6 +122,7 @@ Status: ✅ Verified — this means nested object defaults are LOST when user pr
 Multiple agents may work in this repository simultaneously.
 
 **FORBIDDEN:**
+
 - `git checkout .` — discards ALL uncommitted changes
 - `git reset --hard` — destroys work from other agents
 - `git clean -fd` — deletes untracked files indiscriminately
@@ -123,6 +130,7 @@ Multiple agents may work in this repository simultaneously.
 - `git rebase` on shared branches without explicit user approval
 
 **REQUIRED:**
+
 - Revert files ONE AT A TIME with explicit user confirmation
 - Always check `git status` before any revert
 - Ask the user for confirmation before reverting any file
@@ -182,7 +190,7 @@ Code should be self-documenting. JSDoc on **public/exported functions** is requi
 
 ```typescript
 // FORBIDDEN — restates code
-const x = a + b;  // add a and b
+const x = a + b; // add a and b
 
 // FORBIDDEN — adds noise
 function foo() {
@@ -208,6 +216,7 @@ Pure helpers (`src/utils/grid.ts`, etc.) **MUST** have tests written before impl
 **Tests are not optional for new pure helpers.**
 
 For UI rendering (Lit components, editor), automated tests are deferred — they require `jsdom` + HA stubs which add too much overhead. Use:
+
 - Code review (the dispatch guard guarantees list-view non-regression)
 - Manual visual smoke test against a real HA instance
 
@@ -216,6 +225,7 @@ For UI rendering (Lit components, editor), automated tests are deferred — they
 If you ran `npm install` to set up your local environment, the resulting `package-lock.json` drift is local-only and should NOT be committed unless you also added/removed/upgraded a dependency.
 
 Before committing:
+
 ```bash
 git status
 # If only package-lock.json shows as modified, AND you didn't change package.json:
@@ -227,6 +237,7 @@ git checkout -- package-lock.json
 **Never assume architectural choices. State the trade-offs and ask.**
 
 When uncertain about:
+
 - Whether a config field should be flat or nested (the answer is **flat scalar** in this repo, due to the shallow-merge bug at `setConfig`)
 - Whether a field should be exposed in the editor or YAML-only
 - Whether to add a new test framework, dependency, or build step
@@ -302,6 +313,7 @@ README.md                                   ← user-facing; update last
 ```
 
 When a conflict is found:
+
 1. Read the source. That is what runs.
 2. Update the design doc to match if the source is correct.
 3. Document the discrepancy in the work log.
@@ -540,7 +552,7 @@ when passing class methods.
 
 ```typescript
 // FORBIDDEN
-const start = config.time_grid_start_hour;  // get start hour
+const start = config.time_grid_start_hour; // get start hour
 
 // CORRECT — no comment needed; identifier is self-documenting
 const start = config.time_grid_start_hour;
@@ -573,6 +585,7 @@ Before designing or implementing, list every assumption in a table. Verify each.
 **Format**: `docs/design/NNNN_YYYY-MM-DD_description.md`
 
 **Content requirements:**
+
 - What was done (concrete files modified, lines changed)
 - What was verified vs. assumed (cite source file:line for verifications)
 - Build/lint results
@@ -580,6 +593,7 @@ Before designing or implementing, list every assumption in a table. Verify each.
 - Any open questions or follow-ups
 
 **Get next sequence number:**
+
 ```bash
 cd docs/design
 NEXT=$(printf "%04d" $(($(ls -1 [0-9][0-9][0-9][0-9]_*.md 2>/dev/null | sed 's/_.*//' | sort -n | tail -1) + 1)))
@@ -587,6 +601,7 @@ echo "Next: $NEXT"
 ```
 
 **Existing work logs:**
+
 - `0001_2026-05-20_time-grid-view-design.md` — design phase (12 review passes, no code yet)
 
 ---
@@ -595,36 +610,36 @@ echo "Next: $NEXT"
 
 ### Essential Files to Read Before Implementing Anything
 
-| File | Purpose | When to Check |
-|---|---|---|
-| `CONTRIBUTING.md` | PR target branch, lint/build commands, style notes | Before first commit |
-| `docs/architecture.md` | High-level architecture, directory tree | Before adding new files |
-| `docs/design/time-grid-view.md` | Time-grid feature design (v13, ~1500 lines) | Before any time-grid work |
-| `src/calendar-card-pro.ts` | Host component lifecycle, render dispatch, setConfig, updateEvents | Always |
-| `src/utils/events.ts` | Event fetch + processing pipeline | Before touching fetch logic |
-| `src/config/types.ts` | Config interface | When adding config fields |
-| `src/config/config.ts` | DEFAULT_CONFIG, hasConfigChanged | When adding config fields |
-| `src/rendering/render.ts` | List-view render path (DO NOT MODIFY for time-grid) | Reference only |
-| `src/rendering/styles.ts` | CSS-in-Lit, custom properties | When adding styles |
-| `src/rendering/editor.ts` | Editor patterns (hand-rolled, not ha-form) | When adding editor fields |
-| `eslint.config.mjs` | Lint rules — `any` is error, `import/order`, etc. | If lint fails |
-| `tsconfig.json` | TS strict, ES2017, lib includes ResizeObserver | If TS errors |
+| File                            | Purpose                                                            | When to Check               |
+| ------------------------------- | ------------------------------------------------------------------ | --------------------------- |
+| `CONTRIBUTING.md`               | PR target branch, lint/build commands, style notes                 | Before first commit         |
+| `docs/architecture.md`          | High-level architecture, directory tree                            | Before adding new files     |
+| `docs/design/time-grid-view.md` | Time-grid feature design (v13, ~1500 lines)                        | Before any time-grid work   |
+| `src/calendar-card-pro.ts`      | Host component lifecycle, render dispatch, setConfig, updateEvents | Always                      |
+| `src/utils/events.ts`           | Event fetch + processing pipeline                                  | Before touching fetch logic |
+| `src/config/types.ts`           | Config interface                                                   | When adding config fields   |
+| `src/config/config.ts`          | DEFAULT_CONFIG, hasConfigChanged                                   | When adding config fields   |
+| `src/rendering/render.ts`       | List-view render path (DO NOT MODIFY for time-grid)                | Reference only              |
+| `src/rendering/styles.ts`       | CSS-in-Lit, custom properties                                      | When adding styles          |
+| `src/rendering/editor.ts`       | Editor patterns (hand-rolled, not ha-form)                         | When adding editor fields   |
+| `eslint.config.mjs`             | Lint rules — `any` is error, `import/order`, etc.                  | If lint fails               |
+| `tsconfig.json`                 | TS strict, ES2017, lib includes ResizeObserver                     | If TS errors                |
 
 ### Key Design Decisions Summary (Time-Grid Feature)
 
-| Decision | Why |
-|---|---|
-| `view: 'list' \| 'time-grid'` discriminator field | Single mode flag, room for future `'month-grid'` |
-| All grid config as flat top-level scalars | Avoids the `setConfig` shallow-merge bug; matches existing convention |
-| `time_grid_navigation_days` separate from `days_to_show` | Decouples grid fetch range from list-view setting |
-| `effectiveDaysToShow?` optional arg on `fetchEventData` | Additive; preserves list-view behavior byte-identically |
-| Pure helpers in `src/utils/grid.ts` | Unit-testable without DOM/Lit/HA mocks |
-| `SLOT_HEIGHT_PX = 24` as code constant, not CSS variable | Avoids inconsistency between renderer / now-line / getCardSize |
-| `border-inline-start` (not `border-left`) | RTL-correct; matches existing list-view pattern |
-| Imperative now-line update + midnight refresh | Avoids full Lit re-render every minute |
-| Cluster-based overlap packing | Standard Google Calendar UX |
-| Vitest for new pure helpers; no editor/UI tests | Right-sized; editor tests would need jsdom + HA stubs |
-| Bundle size cap +20 KB minified | Realistic for new module + helpers + CSS |
+| Decision                                                            | Why                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `view: 'list' \| 'time-grid'` discriminator field                   | Single mode flag, room for future `'month-grid'`                                                                                                                                                                                     |
+| All grid config as flat top-level scalars                           | Avoids the `setConfig` shallow-merge bug; matches existing convention                                                                                                                                                                |
+| `time_grid_navigation_days` separate from `days_to_show`            | Decouples grid fetch range from list-view setting                                                                                                                                                                                    |
+| `effectiveDaysToShow?` optional arg on `fetchEventData`             | Additive; preserves list-view behavior byte-identically                                                                                                                                                                              |
+| Pure helpers in `src/utils/grid.ts`                                 | Unit-testable without DOM/Lit/HA mocks                                                                                                                                                                                               |
+| `SLOT_HEIGHT_PX = 24` as code constant, not CSS variable            | Avoids inconsistency between renderer / now-line / getCardSize                                                                                                                                                                       |
+| `border-inline-start` (not `border-left`)                           | RTL-correct; matches existing list-view pattern                                                                                                                                                                                      |
+| ReactiveControllers for now-line + responsive columns               | Idiomatic Lit 3; encapsulates lifecycle state per concern; `now` lives as `@state` on a controller so past-event styling stays coherent with the line                                                                                |
+| Cluster-based overlap packing                                       | Standard Google Calendar UX                                                                                                                                                                                                          |
+| Vitest for new pure helpers + controllers; no full-DOM editor tests | Right-sized; controllers are tested via lightweight host stubs                                                                                                                                                                       |
+| Bundle size cap +25 KB minified                                     | Revised from +20 KB after reviewer audit added FR-2.6 (+N hidden pill, ↑/↓ clipped indicators), exhaustiveness checks, validation block, ReactiveControllers refactor, and editor select fields. Rationale recorded in worklog 0020. |
 
 ---
 

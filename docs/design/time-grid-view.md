@@ -7,12 +7,13 @@
 This is a spec-driven, test-driven design document. Every assumption is explicit, every claim is cited to source. Acceptance criteria are written as executable specs **before** any production code is written.
 
 > **Revision history**
+>
 > - **v1** — initial draft.
 > - **v2** — corrections after first self-review (DST handling, fetch-window decoupling, etc.).
 > - **v3** — corrections after second self-review (validated by line-by-line code re-read; only confirmed bugs fixed):
 >   - **C-1**: `time_grid_breakpoints` flattened to two top-level scalars to avoid the shallow-merge data-loss bug (`setConfig` does `{ ...DEFAULT_CONFIG, ...config }` which destroys partial nested objects).
 >   - **C-4**: Now-line moved inside the today day-column (was rendered at body level with `left: 0; right: 0`, spanning all columns).
->   - **C-5**: Initial width measurement moved from `firstUpdated()` (which runs *after* first render) to `connectedCallback()` (before Lit schedules the first render). Reading `offsetWidth` synchronously forces a layout pass.
+>   - **C-5**: Initial width measurement moved from `firstUpdated()` (which runs _after_ first render) to `connectedCallback()` (before Lit schedules the first render). Reading `offsetWidth` synchronously forces a layout pass.
 >   - **C-6**: `getCardSize` formula corrected to account for actual rendered grid height (was off by ~6 rows in masonry view).
 >   - **C-7**: Risk description corrected — without `getGridOptions`, section-view cards are full-width natural-height (fine). `getCardSize` is for masonry view only.
 >   - **C-2 (clarification)**: Fetch-window override touches 3 callsites in `events.ts`, not 1. Documented.
@@ -136,51 +137,53 @@ This is a spec-driven, test-driven design document. Every assumption is explicit
 
 Every assumption is listed with how it was verified, with file:line citations against `feature/time-grid-week-view` HEAD.
 
-| # | Assumption | How verified | Status |
-|---|---|---|---|
-| A1 | Repo has a `dev` branch that PRs target | `CONTRIBUTING.md`, `git branch -r` | ✅ Verified |
-| A2 | Project builds with `npm run build` (rollup + esbuild) and lints with `npm run lint` (ESLint + Prettier) | Ran both on the feature branch (clean baseline) | ✅ Verified |
-| A3 | No test infrastructure; CI runs `lint` + `build` on PRs | `package.json` has no `test`; `.github/workflows/ci.yml` runs `lint` and `build` | ✅ Verified |
-| A4 | Card uses Lit 3 (`lit: ^3.3.2`) with `@customElement` and `@property({ attribute: false })` decorators | `package.json`; `src/calendar-card-pro.ts:73-88` | ✅ Verified |
-| A5 | Custom element registers as `calendar-card-pro-dev` in dev builds; rollup rewrites to `calendar-card-pro` for prod | `rollup.config.mjs:39`; `src/calendar-card-pro.ts:73` | ✅ Verified |
-| A6 | `Config` interface contains no `view`, `view_mode`, `layout_mode`, `time_grid_*` fields today | grep in `src/`: zero functional matches | ✅ Verified |
-| A7 | `DEFAULT_CONFIG.days_to_show = 3` | `src/config/config.ts:20` | ✅ Verified |
-| A8 | `setConfig` merges via `{ ...DEFAULT_CONFIG, ...config }` (shallow). **Nested object defaults are lost when the user provides a partial nested object.** Existing `weather` config dodges this via a special-case deep-clone in `helpers.ts:346`. | `src/calendar-card-pro.ts:482`; `src/utils/helpers.ts:346` | ✅ Verified — informs C-1 fix |
-| A9 | `Config.hasConfigChanged` triggers data refetch when `entities`, `days_to_show`, `start_date`, `show_past_events`, `filter_duplicates`, or `refresh_interval` change | `src/config/config.ts:209-246` | ✅ Verified — must add `time_grid_navigation_days` |
-| A10 | Events are fetched once for `days_to_show` from `start_date` reference, cached in `localStorage`. **`fetchEventData` references `config.days_to_show` in 3 places** (cache key arg at line 39, `getTimeWindow` at 61, post-fetch filter at 70-88). The grid view must override at all three. | `src/utils/events.ts:29-95` | ✅ Verified |
-| A11 | HA's `calendars/{entity}?start=…&end=…` REST endpoint returns events whose interval intersects the window | HA developer docs | ✅ Verified |
-| A12 | All-day events have `start.date` (YYYY-MM-DD), no `dateTime`; their `end.date` is **exclusive** in iCal | `src/utils/events.ts:142-147`; HA docs | ✅ Verified |
-| A13 | Timed events have `start.dateTime` as ISO 8601 with TZ offset; `new Date(...)` projects to local time correctly | `src/utils/events.ts:149-150` | ✅ Verified |
-| A14 | `src/utils/format.ts` exports `parseAllDayDate`, `getLocalDateKey`, `formatTime`, `getFirstDayOfWeek` | grep `^export (function|const)` | ✅ Verified |
-| A15 | `getStartDateReference` is **module-private** in `events.ts` (line 1486) — not exported | grep | ✅ Verified |
-| A16 | `groupEventsByDay` injects synthetic `_isEmptyDay` events. Grid view bypasses this function entirely. | `src/utils/events.ts:540-555` | ✅ Verified |
-| A17 | Editor is a hand-rolled LitElement (not `ha-form` schema). Editor stores config in `_config` and accesses via `getConfigValue(path)` (dot-notation supported, see line 116). The editor's `setConfigValue` deep-clones via `JSON.parse(JSON.stringify(...))` then sets nested paths (line 191). Conditional UI reveal pattern: `requestUpdate()` after a `getConfigValue` check (existing example: `editor.ts:660` for `start_date_mode`). | `src/rendering/editor.ts:59, 116, 191, 660, 1453-1675` | ✅ Verified |
-| A18 | Translations: `getTranslations(lang)` (`localize.ts:164-167`) returns the entire bundle, falling back to `'en'` when `lang` is not loaded. `translate(lang, key, fallback)` returns the key string itself if not found. For *editor* translations specifically, `editor.ts:344-358` falls through to English when the language has no `editor` block. | Re-read `localize.ts:160-209`, `editor.ts:340-358` | ✅ Verified |
-| A19 | dayjs is used only for relative-time formatting; the rest of the code uses native `Date` | grep `dayjs` in `src/` | ✅ Verified |
-| A20 | The card has no `@media` queries and no `ResizeObserver` usage today | grep | ✅ Verified |
-| A21 | The card does not implement HA Lovelace `getCardSize()` / `getGridOptions()`. **Without `getGridOptions`, section-view cards are full-width natural-height** (HA frontend default). `getCardSize` defaults to 1 (50 px) which is bad for masonry view. **This PR adds `getCardSize`; we do NOT add `getGridOptions`.** | grep returns no matches; HA developer docs | ✅ Verified |
-| A22 | ESLint flat config enforces `@typescript-eslint/no-explicit-any: error`, `import/order`, `prettier/prettier`, `sort-imports` (member only). `noUnusedParameters: true` in `tsconfig.json`. | `eslint.config.mjs`, `tsconfig.json` | ✅ Verified |
-| A23 | `tsconfig.json`: `target: ES2017`, `lib: [ES2017, DOM, DOM.Iterable]`, `noEmit: true` (esbuild compiles). `lib.dom.d.ts` includes `ResizeObserver`. | `tsconfig.json` | ✅ Verified |
-| A24 | All browsers HA supports include `ResizeObserver` (Chromium, Firefox 69+, Safari 13.1+). | Spec | ✅ Verified |
-| A25 | The card runs inside HA dashboards; width is dictated by parent container, not viewport. The implementation observes the **card's own width** via `ResizeObserver` on `this`. | HA documentation pattern | ✅ Verified |
-| A26 | **Lit lifecycle:** `constructor → connectedCallback → first update/render → firstUpdated`. `connectedCallback` runs *before* the first render, and reading `this.offsetWidth` there forces a synchronous layout pass returning a valid width. `firstUpdated` runs *after* the first render — too late to seed initial state without a re-render. | Lit docs; spec semantics | ✅ Verified — informs C-5 fix |
-| A27 | When `view: 'time-grid'`, fetch a wider window (`time_grid_navigation_days` days, default 28) so users can navigate ~4 weeks without re-fetching. | Stakeholder decision | ✅ |
-| A28 | The HA frontend allows `customElements.define` to be called only once per name | Web Components spec | ✅ Verified |
-| A29 | The visual editor (`calendar-card-pro-dev-editor`) is a separate web component | `src/calendar-card-pro.ts:651` | ✅ Verified |
-| A30 | Most internal helpers (`splitMultiDayEvent`, `processMultiDayEvents`, `renderEventWeather`, `formatAllDayDate`, `isMultiDayEvent`, `renderTodayIndicator`) are not exported. The grid view replicates only the small bits it needs in `utils/grid.ts`. | grep | ✅ Verified |
-| A31 | Existing `splitMultiDayEvent` (events.ts:737) converts middle days of a multi-day timed event to **all-day** segments. We must not reuse it for grid view; we use our own splitter `splitTimedEventByDay` that preserves timed semantics. | `src/utils/events.ts:737-828` | ✅ Verified |
-| A32 | `instanceId` is generated from `(entities, days_to_show, show_past_events, start_date)` and is the prefix of cache keys. The full cache key also embeds `daysToShow` separately (`getBaseCacheKey` line 1409). So toggling between list view and grid view (with different effective `daysToShow`) produces **different cache keys** even though `instanceId` is shared — caches do NOT collide. | `src/utils/helpers.ts: generateDeterministicId`; `src/utils/events.ts:1409` | ✅ Verified — false alarm in v2 |
-| A33 | The existing `_handleVisibilityChange` (line 264-273) only acts on `'visible'` (data refresh). It does NOT pause anything on `'hidden'`. The grid view ADDS a `'hidden'` branch to pause the now-line interval; we are not "mirroring" existing pause behavior. | `src/calendar-card-pro.ts:264-273` | ✅ Verified |
+| #   | Assumption                                                                                                                                                                                                                                                                                                                                                                                                                                 | How verified                                                                     | Status                                             |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- | -------------------------------------------------- | ----------- |
+| A1  | Repo has a `dev` branch that PRs target                                                                                                                                                                                                                                                                                                                                                                                                    | `CONTRIBUTING.md`, `git branch -r`                                               | ✅ Verified                                        |
+| A2  | Project builds with `npm run build` (rollup + esbuild) and lints with `npm run lint` (ESLint + Prettier)                                                                                                                                                                                                                                                                                                                                   | Ran both on the feature branch (clean baseline)                                  | ✅ Verified                                        |
+| A3  | No test infrastructure; CI runs `lint` + `build` on PRs                                                                                                                                                                                                                                                                                                                                                                                    | `package.json` has no `test`; `.github/workflows/ci.yml` runs `lint` and `build` | ✅ Verified                                        |
+| A4  | Card uses Lit 3 (`lit: ^3.3.2`) with `@customElement` and `@property({ attribute: false })` decorators                                                                                                                                                                                                                                                                                                                                     | `package.json`; `src/calendar-card-pro.ts:73-88`                                 | ✅ Verified                                        |
+| A5  | Custom element registers as `calendar-card-pro-dev` in dev builds; rollup rewrites to `calendar-card-pro` for prod                                                                                                                                                                                                                                                                                                                         | `rollup.config.mjs:39`; `src/calendar-card-pro.ts:73`                            | ✅ Verified                                        |
+| A6  | `Config` interface contains no `view`, `view_mode`, `layout_mode`, `time_grid_*` fields today                                                                                                                                                                                                                                                                                                                                              | grep in `src/`: zero functional matches                                          | ✅ Verified                                        |
+| A7  | `DEFAULT_CONFIG.days_to_show = 3`                                                                                                                                                                                                                                                                                                                                                                                                          | `src/config/config.ts:20`                                                        | ✅ Verified                                        |
+| A8  | `setConfig` merges via `{ ...DEFAULT_CONFIG, ...config }` (shallow). **Nested object defaults are lost when the user provides a partial nested object.** Existing `weather` config dodges this via a special-case deep-clone in `helpers.ts:346`.                                                                                                                                                                                          | `src/calendar-card-pro.ts:482`; `src/utils/helpers.ts:346`                       | ✅ Verified — informs C-1 fix                      |
+| A9  | `Config.hasConfigChanged` triggers data refetch when `entities`, `days_to_show`, `start_date`, `show_past_events`, `filter_duplicates`, or `refresh_interval` change                                                                                                                                                                                                                                                                       | `src/config/config.ts:209-246`                                                   | ✅ Verified — must add `time_grid_navigation_days` |
+| A10 | Events are fetched once for `days_to_show` from `start_date` reference, cached in `localStorage`. **`fetchEventData` references `config.days_to_show` in 3 places** (cache key arg at line 39, `getTimeWindow` at 61, post-fetch filter at 70-88). The grid view must override at all three.                                                                                                                                               | `src/utils/events.ts:29-95`                                                      | ✅ Verified                                        |
+| A11 | HA's `calendars/{entity}?start=…&end=…` REST endpoint returns events whose interval intersects the window                                                                                                                                                                                                                                                                                                                                  | HA developer docs                                                                | ✅ Verified                                        |
+| A12 | All-day events have `start.date` (YYYY-MM-DD), no `dateTime`; their `end.date` is **exclusive** in iCal                                                                                                                                                                                                                                                                                                                                    | `src/utils/events.ts:142-147`; HA docs                                           | ✅ Verified                                        |
+| A13 | Timed events have `start.dateTime` as ISO 8601 with TZ offset; `new Date(...)` projects to local time correctly                                                                                                                                                                                                                                                                                                                            | `src/utils/events.ts:149-150`                                                    | ✅ Verified                                        |
+| A14 | `src/utils/format.ts` exports `parseAllDayDate`, `getLocalDateKey`, `formatTime`, `getFirstDayOfWeek`                                                                                                                                                                                                                                                                                                                                      | grep `^export (function                                                          | const)`                                            | ✅ Verified |
+| A15 | `getStartDateReference` is **module-private** in `events.ts` (line 1486) — not exported                                                                                                                                                                                                                                                                                                                                                    | grep                                                                             | ✅ Verified                                        |
+| A16 | `groupEventsByDay` injects synthetic `_isEmptyDay` events. Grid view bypasses this function entirely.                                                                                                                                                                                                                                                                                                                                      | `src/utils/events.ts:540-555`                                                    | ✅ Verified                                        |
+| A17 | Editor is a hand-rolled LitElement (not `ha-form` schema). Editor stores config in `_config` and accesses via `getConfigValue(path)` (dot-notation supported, see line 116). The editor's `setConfigValue` deep-clones via `JSON.parse(JSON.stringify(...))` then sets nested paths (line 191). Conditional UI reveal pattern: `requestUpdate()` after a `getConfigValue` check (existing example: `editor.ts:660` for `start_date_mode`). | `src/rendering/editor.ts:59, 116, 191, 660, 1453-1675`                           | ✅ Verified                                        |
+| A18 | Translations: `getTranslations(lang)` (`localize.ts:164-167`) returns the entire bundle, falling back to `'en'` when `lang` is not loaded. `translate(lang, key, fallback)` returns the key string itself if not found. For _editor_ translations specifically, `editor.ts:344-358` falls through to English when the language has no `editor` block.                                                                                      | Re-read `localize.ts:160-209`, `editor.ts:340-358`                               | ✅ Verified                                        |
+| A19 | dayjs is used only for relative-time formatting; the rest of the code uses native `Date`                                                                                                                                                                                                                                                                                                                                                   | grep `dayjs` in `src/`                                                           | ✅ Verified                                        |
+| A20 | The card has no `@media` queries and no `ResizeObserver` usage today                                                                                                                                                                                                                                                                                                                                                                       | grep                                                                             | ✅ Verified                                        |
+| A21 | The card does not implement HA Lovelace `getCardSize()` / `getGridOptions()`. **Without `getGridOptions`, section-view cards are full-width natural-height** (HA frontend default). `getCardSize` defaults to 1 (50 px) which is bad for masonry view. **This PR adds `getCardSize`; we do NOT add `getGridOptions`.**                                                                                                                     | grep returns no matches; HA developer docs                                       | ✅ Verified                                        |
+| A22 | ESLint flat config enforces `@typescript-eslint/no-explicit-any: error`, `import/order`, `prettier/prettier`, `sort-imports` (member only). `noUnusedParameters: true` in `tsconfig.json`.                                                                                                                                                                                                                                                 | `eslint.config.mjs`, `tsconfig.json`                                             | ✅ Verified                                        |
+| A23 | `tsconfig.json`: `target: ES2017`, `lib: [ES2017, DOM, DOM.Iterable]`, `noEmit: true` (esbuild compiles). `lib.dom.d.ts` includes `ResizeObserver`.                                                                                                                                                                                                                                                                                        | `tsconfig.json`                                                                  | ✅ Verified                                        |
+| A24 | All browsers HA supports include `ResizeObserver` (Chromium, Firefox 69+, Safari 13.1+).                                                                                                                                                                                                                                                                                                                                                   | Spec                                                                             | ✅ Verified                                        |
+| A25 | The card runs inside HA dashboards; width is dictated by parent container, not viewport. The implementation observes the **card's own width** via `ResizeObserver` on `this`.                                                                                                                                                                                                                                                              | HA documentation pattern                                                         | ✅ Verified                                        |
+| A26 | **Lit lifecycle:** `constructor → connectedCallback → first update/render → firstUpdated`. `connectedCallback` runs _before_ the first render, and reading `this.offsetWidth` there forces a synchronous layout pass returning a valid width. `firstUpdated` runs _after_ the first render — too late to seed initial state without a re-render.                                                                                           | Lit docs; spec semantics                                                         | ✅ Verified — informs C-5 fix                      |
+| A27 | When `view: 'time-grid'`, fetch a wider window (`time_grid_navigation_days` days, default 28) so users can navigate ~4 weeks without re-fetching.                                                                                                                                                                                                                                                                                          | Stakeholder decision                                                             | ✅                                                 |
+| A28 | The HA frontend allows `customElements.define` to be called only once per name                                                                                                                                                                                                                                                                                                                                                             | Web Components spec                                                              | ✅ Verified                                        |
+| A29 | The visual editor (`calendar-card-pro-dev-editor`) is a separate web component                                                                                                                                                                                                                                                                                                                                                             | `src/calendar-card-pro.ts:651`                                                   | ✅ Verified                                        |
+| A30 | Most internal helpers (`splitMultiDayEvent`, `processMultiDayEvents`, `renderEventWeather`, `formatAllDayDate`, `isMultiDayEvent`, `renderTodayIndicator`) are not exported. The grid view replicates only the small bits it needs in `utils/grid.ts`.                                                                                                                                                                                     | grep                                                                             | ✅ Verified                                        |
+| A31 | Existing `splitMultiDayEvent` (events.ts:737) converts middle days of a multi-day timed event to **all-day** segments. We must not reuse it for grid view; we use our own splitter `splitTimedEventByDay` that preserves timed semantics.                                                                                                                                                                                                  | `src/utils/events.ts:737-828`                                                    | ✅ Verified                                        |
+| A32 | `instanceId` is generated from `(entities, days_to_show, show_past_events, start_date)` and is the prefix of cache keys. The full cache key also embeds `daysToShow` separately (`getBaseCacheKey` line 1409). So toggling between list view and grid view (with different effective `daysToShow`) produces **different cache keys** even though `instanceId` is shared — caches do NOT collide.                                           | `src/utils/helpers.ts: generateDeterministicId`; `src/utils/events.ts:1409`      | ✅ Verified — false alarm in v2                    |
+| A33 | The existing `_handleVisibilityChange` (line 264-273) only acts on `'visible'` (data refresh). It does NOT pause anything on `'hidden'`. The grid view ADDS a `'hidden'` branch to pause the now-line interval; we are not "mirroring" existing pause behavior.                                                                                                                                                                            | `src/calendar-card-pro.ts:264-273`                                               | ✅ Verified                                        |
 
 ## 4. Functional requirements (numbered, testable)
 
 ### FR-1: View selector
+
 - **FR-1.1** A new `Config.view` field is introduced with type `'list' | 'time-grid'`. Default: `'list'`.
 - **FR-1.2** With `view: 'list'` (or unset), the card render path is **unchanged**: same `Render.renderGroupedEvents` callsite, same arguments. No-regression is guaranteed by code review and a manual visual smoke test.
 - **FR-1.3** With `view: 'time-grid'`, the card renders the new grid layout (FR-2 onwards).
 - **FR-1.4** `setConfig` validates `view`: any value other than `'list'` or `'time-grid'` is silently coerced to `'list'`, with a `Logger.warn`.
 
 ### FR-2: Time-grid layout
+
 - **FR-2.1** The grid shows N day columns side-by-side, where N ∈ {1, 3, 7} is determined responsively (FR-3).
 - **FR-2.2** Each column has a header showing weekday name and day-of-month (and month, when the column is the first of a new month). Reuses `Localize.getTranslations(lang).daysOfWeek` and `.months`.
 - **FR-2.3** Hour range: `time_grid_start_hour` (default 6) and `time_grid_end_hour` (default 22). Constraints: `time_grid_start_hour ∈ [0, 23]` (integer), `time_grid_end_hour ∈ [1, 24]` (integer), and `time_grid_start_hour < time_grid_end_hour`. If either constraint fails, **both** are coerced to defaults (6, 22) and a `Logger.warn` is logged.
@@ -189,6 +192,7 @@ Every assumption is listed with how it was verified, with file:line citations ag
   **Hour-axis labels:** one label per hour, rendered at hours `[start_hour, start_hour+1, ..., end_hour - 1]` (NOT at `end_hour` — avoids labeling the bottom edge twice and avoids the `hour=24` edge case). Total labels = `end_hour - start_hour`. Each label is top-aligned with the slot at `H:00`.
 
   **Format**: hour-only (no minutes), respecting the resolved 24h flag. Resolution mirrors the existing logic at `format.ts:70-71`:
+
   ```ts
   // Existing logic in format.ts:70-71:
   //   const useNativeFormatting = !!(config.time_24h === 'system' && hass?.locale);
@@ -198,12 +202,14 @@ Every assumption is listed with how it was verified, with file:line citations ag
   // (12-hour AM/PM). Users wanting 24h must set time_24h: true explicitly.
   const use24h = config.time_24h === true;
   ```
+
   - `use24h: true` → `0`, `1`, …, `23`
   - `use24h: false` → `12 AM`, `1 AM`, …, `11 AM`, `12 PM`, `1 PM`, …, `11 PM`
 
   Implementation: a pure helper in `utils/grid.ts:formatHourLabel(hour: number, use24h: boolean): string` (NOT in `render-grid.ts` — keeping it in `utils/grid.ts` matches its pure-function nature and enables unit-testing per §10.1). We do NOT reuse `FormatUtils.formatTime` because it always emits minutes (`6:00`, `6:00 AM`), wasting axis width.
 
   Labels for half-hour or quarter-hour slots are NOT rendered (would crowd at 15-min). At `60`-min interval, every slot is a labeled hour.
+
 - **FR-2.5** Timed events are positioned absolutely within their day column. The pure helper `computeEventPlacement` (§6.3) returns:
   - **Defensive guard**: if `endMin ≤ startMin` (malformed input), returns `outsideRange: true`.
   - If `endMin ≤ gridStartMin` or `startMin ≥ gridEndMin` (event entirely outside visible window): `outsideRange: true`.
@@ -214,15 +220,20 @@ Every assumption is listed with how it was verified, with file:line citations ag
   - Always: event title (one line, truncated with ellipsis).
   - When `heightPx ≥ 32px`: title + start-end time (HH:mm).
   - When `heightPx ≥ 56px`: title + time + location (if present).
-  - **Per-entity overrides**: `show_location` and `show_description` are resolved via `EventUtils.getEntitySetting(event._entityId, 'show_location' | 'show_description', config, event)` — same pattern as list view at `events.ts:241,246`. The progressive-disclosure thresholds gate space; the per-entity (or global) flag gates intent.
-  - Weather and description are NOT shown inline (deferred to a follow-up tooltip/expand interaction).
-- **FR-2.6** Clipping indicators: events with `clippedTop` get a `↑` indicator; `clippedBottom` get `↓`. Events with `outsideRange: true` are aggregated into a small "+N hidden" pill at the top of the column.
+  - **Per-entity overrides**: `show_location` is resolved via `EventUtils.getEntitySetting(event._entityId, 'show_location', config, event)` — same pattern as list view at `events.ts:241`. The progressive-disclosure threshold gates space; the per-entity (or global) flag gates intent.
+  - Weather, description, and `show_description` are NOT shown inline. Description rendering would compete with the limited vertical space of an event block; users wanting full event detail use the list view. (Earlier drafts of this design proposed honoring `show_description` per-entity in grid view; corrected in worklog 0020 to match the shipped behavior.)
+
+- **FR-2.6** Out-of-band and clipped indicators (fully implemented per worklog 0020):
+  - Events with `outsideRange: true` (their entire span lies outside `[time_grid_start_hour, time_grid_end_hour)`) are aggregated per-day into a small "+N hidden" pill rendered at the top of the day column. Clicking the pill is a no-op in v1 (a tooltip listing the hidden events is a follow-up). The pill renders only when the per-column count is ≥ 1.
+  - Events whose timed segment crosses the band's top boundary (`clippedTop: true`) display a `↑` glyph at the top of the event block via a CSS pseudo-element (`.ccp-grid-event.clipped-top::before`).
+  - Events whose timed segment crosses the band's bottom boundary (`clippedBottom: true`) display a `↓` glyph at the bottom (`.ccp-grid-event.clipped-bottom::after`).
+  - The indicators are decorative (aria-hidden); the event title and time still convey the full information for assistive technology.
 - **FR-2.7** All-day events render in a banner strip above the time grid.
   - **Layout**: the strip is a CSS Grid with the same column template as the headers (`<axis-width> repeat(N, 1fr)`). For each banner, the renderer first computes `eventStartDay` and `eventEndDay` from the iCal event:
     ```ts
-    const eventStartDay = FormatUtils.parseAllDayDate(event.start.date);  // local midnight
-    const eventEndDay = FormatUtils.parseAllDayDate(event.end.date);      // iCal end (exclusive)
-    eventEndDay.setDate(eventEndDay.getDate() - 1);                       // convert to inclusive last visible day
+    const eventStartDay = FormatUtils.parseAllDayDate(event.start.date); // local midnight
+    const eventEndDay = FormatUtils.parseAllDayDate(event.end.date); // iCal end (exclusive)
+    eventEndDay.setDate(eventEndDay.getDate() - 1); // convert to inclusive last visible day
     ```
     Then (using `daysBetween` from `utils/grid.ts`):
     - `rawDayIdx = daysBetween(windowStart, eventStartDay)` — non-negative when event starts within or after window; negative when event started before window.
@@ -255,6 +266,7 @@ Every assumption is listed with how it was verified, with file:line citations ag
 - **FR-2.12** Empty event list: when `events.length === 0`, the grid still renders column headers, time axis, and now-line (if today visible). No banner strip. No event blocks.
 
 ### FR-3: Responsive column count
+
 - **FR-3.1** The card observes its own rendered width via `ResizeObserver` and selects N:
   - `width < bp_three` → N = 1
   - `bp_three ≤ width < bp_seven` → N = 3
@@ -267,6 +279,7 @@ Every assumption is listed with how it was verified, with file:line citations ag
 - **FR-3.5** When N changes, only the rendering re-runs — events are not re-fetched.
 
 ### FR-4: Navigation
+
 - **FR-4.1** When `view: 'time-grid'`, the card displays a header bar above the grid:
   - **N = 7 (week-aligned per FR-5.1)**: `<<` `Today` `>>` plus the date-range label. Single-step `<` `>` buttons are **hidden** because the window snaps to week boundaries — a 1-day shift would mostly be a no-op (the same week is shown). Only week-step navigation makes sense.
   - **N = 3 (rolling per FR-5.2)**: `<<` `<` `Today` `>` `>>` plus the date-range label.
@@ -278,6 +291,7 @@ Every assumption is listed with how it was verified, with file:line citations ag
 - **FR-4.6** Date-range label clicks are inert.
 
 ### FR-5: Window alignment & navigation range
+
 - **FR-5.1** When N = 7, the visible window is **week-aligned**: starts on `first_day_of_week` (Sunday or Monday).
 - **FR-5.2** When N ∈ {1, 3}, the window is **rolling**: starts at `referenceDate + offsetDays`.
 - **FR-5.3** `Today` returns the visible window to one containing today. Implementation:
@@ -295,7 +309,9 @@ Every assumption is listed with how it was verified, with file:line citations ag
   - line 70 (post-fetch filter `limitDate`)
 
   `groupEventsByDay` (line 326) is unchanged — only used by list view.
+
 - **FR-5.5** `hasConfigChanged()` is updated to be **view-aware** at `src/config/config.ts:234-239`:
+
   ```ts
   // BEFORE (existing):
   const dataChanged =
@@ -309,26 +325,30 @@ Every assumption is listed with how it was verified, with file:line citations ag
   const isGridView = current.view === 'time-grid';
   const viewChanged = previous.view !== current.view;
   const dataChanged =
-    viewChanged ||                                                                    // toggling list↔grid changes effective fetch range
+    viewChanged || // toggling list↔grid changes effective fetch range
     previousEntityIds !== currentEntityIds ||
-    (!isGridView && previous.days_to_show !== current.days_to_show) ||                 // list view: refetch on days_to_show
-    (isGridView && previous.time_grid_navigation_days !== current.time_grid_navigation_days) ||  // grid view: refetch on nav days
+    (!isGridView && previous.days_to_show !== current.days_to_show) || // list view: refetch on days_to_show
+    (isGridView && previous.time_grid_navigation_days !== current.time_grid_navigation_days) || // grid view: refetch on nav days
     previous.start_date !== current.start_date ||
     previous.show_past_events !== current.show_past_events ||
     previous.filter_duplicates !== current.filter_duplicates;
   ```
+
   - When `view === 'time-grid'`, `days_to_show` mutations are ignored (grid view uses `time_grid_navigation_days` instead).
   - When `view === 'list'`, `time_grid_navigation_days` mutations are ignored (list view doesn't use it).
   - **`view` itself triggers refetch** so the cache and effective fetch range stay in sync (v10-F3 fix).
   - Other fields work as before.
+
 - **FR-5.6** If a user sets `time_grid_navigation_days < time_grid_max_days`, the editor shows a hint in the field's helper-text recommending a higher value. **No silent override** — user can shoot themselves in the foot but is informed.
 
 ### FR-6: All-day banner strip
+
 - **FR-6.1** Rendered when the visible window contains any all-day event.
 - **FR-6.2** Strip height: `max-height: var(--calendar-card-grid-allday-max-height, 6em)`, `overflow: hidden`.
 - **FR-6.3** Omitted (zero height) when no all-day events in window.
 
 ### FR-7: Editor support
+
 - **FR-7.1** View selector (List / Time grid) inside Core Settings.
 - **FR-7.2** When `view = time-grid`, the editor reveals a "Time grid" expansion panel: `time_grid_start_hour`, `time_grid_end_hour`, `time_grid_interval_minutes`, `time_grid_event_min_height_px`, `time_grid_max_days`, `time_grid_navigation_days`, `time_grid_breakpoint_three_day_px`, `time_grid_breakpoint_seven_day_px`, `time_grid_show_now_line`, `time_grid_allday_bg_opacity`.
 - **FR-7.3** Conditional reveal uses `this.requestUpdate()` after the view selector changes (mirrors `editor.ts:660`).
@@ -348,10 +368,12 @@ Every assumption is listed with how it was verified, with file:line citations ag
   When the user toggles the view selector, `_valueChanged` fires `_fireConfigChanged` which updates `_config` (reactive prop), Lit auto re-renders, the conditional re-evaluates, fields appear/disappear.
 
 ### FR-8: Localization
+
 - **FR-8.1** No new user-facing strings outside the editor labels and five navigation strings (`time_grid_today`, `time_grid_prev_day_aria`, `time_grid_next_day_aria`, `time_grid_prev_window_aria`, `time_grid_next_window_aria`). Column headers reuse `daysOfWeek`/`months`. Hour labels use `formatHourLabel` (utils/grid.ts).
 - **FR-8.2** New strings added to `en.json`. Other 32 languages can be updated in follow-ups.
 
 ### FR-9: Theming and styling
+
 - **FR-9.1** Grid-view colors derive from existing config fields where reasonable (`accent_color`, `event_color`, `time_color`, `weekday_color`, `today_*_color`).
 - **FR-9.2** New CSS custom properties (all under `--calendar-card-grid-*`):
   - `--calendar-card-grid-time-axis-width` (default `48px`)
@@ -360,25 +382,29 @@ Every assumption is listed with how it was verified, with file:line citations ag
   - `--calendar-card-grid-allday-max-height` (default `6em`)
 
   Note: slot height is **not** a CSS variable (v4-F9 fix); see FR-2.4.
+
 - **FR-9.3** Per-event positioning (`top`, `height`, `left`, `width`) is applied **inline via Lit `styleMap`**, not via CSS custom properties. The grid container's `grid-template-columns` is also set inline via `styleMap` (avoids `repeat(var(--n))` fragility).
 
 ### FR-10: Lovelace card sizing
+
 - **FR-10.1** The card implements `getCardSize()`:
-  - `view: 'list'` → returns `3` (existing default behavior).
+  - `view: 'list'` → returns `1`. List view did not previously implement `getCardSize`, and HA's documented default for an undefined `getCardSize` is `1`. Returning `1` here preserves the existing list-view masonry-layout behavior byte-identically (Rule 5). Earlier drafts of this design proposed returning `3`; that was a mistake — it would have changed list-view masonry sizing for existing users. Corrected in worklog 0020.
   - `view: 'time-grid'` → returns approximately the rendered card height in 50-px rows:
     ```ts
     const slotsPerHour = 60 / config.time_grid_interval_minutes;
-    const gridPx = (config.time_grid_end_hour - config.time_grid_start_hour) * slotsPerHour * 24;  // 24 = default slot height
-    const chromePx = 80;  // nav header + day headers
+    const gridPx =
+      (config.time_grid_end_hour - config.time_grid_start_hour) * slotsPerHour * SLOT_HEIGHT_PX;
+    const chromePx = NAV_BAR_PX + DAY_HEADER_PX + ALLDAY_RESERVE_PX; // ≈ 80 by default
     return Math.ceil((gridPx + chromePx) / 50);
     ```
-  For default 06–22 with 30-min interval: `(16 * 2 * 24 + 80) / 50 = 17 rows`. (Approximate; ignores all-day strip and now-line for simplicity.)
+    For default 06–22 with 30-min interval: `(16 * 2 * 24 + 80) / 50 = 17 rows`. (Approximate; ignores all-day strip overflow and now-line for simplicity.)
 - **FR-10.2** `getGridOptions()` is **NOT** added in this PR. Without it, HA section-view defaults to full-width natural-height — fine for the time-grid view.
 
 ### FR-11: Performance
-- **FR-11.1** List-view render path is byte-for-byte unchanged. Bundle-size delta target: ≤ +20 KB minified (current: 284 KB → cap 304 KB). Estimate breakdown: utils/grid.ts ~5 KB, render-grid.ts ~7 KB, calendar-card-pro.ts additions ~4 KB, editor additions ~2 KB, CSS additions ~2 KB.
+
+- **FR-11.1** List-view render path is byte-for-byte unchanged. Bundle-size delta target: ≤ +25 KB minified (current: 282 KB → cap 307 KB). Estimate breakdown: utils/grid.ts ~5 KB, render-grid.ts ~7 KB, calendar-card-pro.ts additions ~3 KB, ReactiveControllers ~2 KB, editor additions ~3 KB, validation block + i18n ~2 KB, CSS additions ~3 KB. Cap raised from +20 KB after the reviewer-mandated additions in worklog 0020 (FR-2.6 hidden pill + clipped indicators, exhaustiveness check, full validation, IntersectionObserver, accessibility fixes, controllers refactor).
 - **FR-11.2** `ResizeObserver` re-renders are coalesced to one per animation frame.
-- **FR-11.3** Now-line position updates are imperative (one DOM mutation per minute), not via Lit re-render.
+- **FR-11.3** Now-line position is owned by a `NowLineController` (Lit 3 ReactiveController). The controller exposes `now` as `@state`; updates to it (60 s tick + midnight rollover + visibility-resume) trigger Lit re-renders and the renderer reads `ctx.now` from the controller. The controller pauses ticks via `IntersectionObserver` when the host is off-screen and via `document.visibilityState` when the tab is hidden, so cards on inactive HA dashboard tabs do not consume CPU.
 - **FR-11.4** Now-line interval is started in `connectedCallback` when `view === 'time-grid'` and `time_grid_show_now_line` is true; stopped in `disconnectedCallback`. The `visibilitychange: 'hidden'` handler also stops it; `'visible'` restarts it. Each tick (every 60s) calls `_updateNowLinePosition`, which is a **no-op** when today is not in the visible window (per FR-2.10). The interval does not stop/start based on today visibility — that's a deferred optimization (low value: 1 wasted call/min when today is out of window).
 - **FR-11.5** **Midnight refresh.** Without intervention, `ctx.now` (captured at render time) becomes stale at midnight: yesterday's column retains the `today` class until the next re-render trigger (config change, resize, navigation). v9 piggybacks on the now-line interval: each tick compares `startOfDay(new Date())` against the renderer's last-known "today" date (cached on the host as `_lastRenderDay`). If the local date has changed, the host calls `this.requestUpdate()` to force a re-render with the fresh `ctx.now`. This costs at most 1 wasted re-render per day. Implementation:
   ```ts
@@ -397,21 +423,22 @@ Every assumption is listed with how it was verified, with file:line citations ag
 
 ```ts
 // In src/config/types.ts, Config interface, near `language?:`
-view: 'list' | 'time-grid';                    // default 'list'
+view: 'list' | 'time-grid'; // default 'list'
 
-time_grid_start_hour: number;                  // 0..23, default 6
-time_grid_end_hour: number;                    // 1..24, default 22
-time_grid_interval_minutes: 15 | 30 | 60;      // default 30
-time_grid_event_min_height_px: number;         // pixels, default 24
-time_grid_max_days: 1 | 3 | 7;                 // default 7 — caps responsive N
-time_grid_navigation_days: number;             // default 28 — fetch window for grid view
-time_grid_show_now_line: boolean;              // default true
-time_grid_allday_bg_opacity: number;           // 0..1, default 0.2 — banner background alpha
-time_grid_breakpoint_three_day_px: number;     // default 500
-time_grid_breakpoint_seven_day_px: number;     // default 900
+time_grid_start_hour: number; // 0..23, default 6
+time_grid_end_hour: number; // 1..24, default 22
+time_grid_interval_minutes: 15 | 30 | 60; // default 30
+time_grid_event_min_height_px: number; // pixels, default 24
+time_grid_max_days: 1 | 3 | 7; // default 7 — caps responsive N
+time_grid_navigation_days: number; // default 28 — fetch window for grid view
+time_grid_show_now_line: boolean; // default true
+time_grid_allday_bg_opacity: number; // 0..1, default 0.2 — banner background alpha
+time_grid_breakpoint_three_day_px: number; // default 500
+time_grid_breakpoint_seven_day_px: number; // default 900
 ```
 
 **Naming rationale (revised in v3):**
+
 - All fields prefixed `time_grid_*` to (a) avoid collisions with HA Lovelace `grid_options`, (b) leave room for future `month_grid_*`.
 - `view` is unprefixed — top-level mode discriminator.
 - `time_grid_navigation_days` is decoupled from `days_to_show`.
@@ -503,9 +530,12 @@ export interface EventPlacement {
 
 /** Compute placement for one timed event. */
 export function computeEventPlacement(
-  startMin: number, endMin: number,
-  gridStartMin: number, gridEndMin: number,
-  slotHeightPx: number, intervalMin: number,
+  startMin: number,
+  endMin: number,
+  gridStartMin: number,
+  gridEndMin: number,
+  slotHeightPx: number,
+  intervalMin: number,
   minHeightPx: number,
 ): EventPlacement;
 
@@ -518,14 +548,13 @@ export function layoutOverlaps<T extends { startMin: number; endMin: number }>(
  *  Drops zero-duration segments (e.g., events ending exactly at midnight). */
 export function splitTimedEventByDay(
   event: Types.CalendarEventData,
-  windowStart: Date, windowEnd: Date,
+  windowStart: Date,
+  windowEnd: Date,
 ): Types.CalendarEventData[];
 
 /** Reference date for grid view. Replicates events.ts:getStartDateReference logic
  *  via the public getTimeWindow. Returns a Date at local 00:00:00.000 (midnight-normalized). */
-export function getReferenceDate(
-  config: Pick<Types.Config, 'start_date' | 'days_to_show'>,
-): Date;
+export function getReferenceDate(config: Pick<Types.Config, 'start_date' | 'days_to_show'>): Date;
 
 /** Detect if an event has ended relative to `now`. Replicates render.ts:isPastEvent semantics. */
 export function isPastEvent(event: Types.CalendarEventData, now: Date): boolean;
@@ -561,6 +590,7 @@ export interface TimeGridContext {
 ```
 
 Internal flow:
+
 1. Compute visible-day window via `snapToWindow`.
 2. Filter events to the window; split timed events crossing midnight via `splitTimedEventByDay`.
 3. Bucket into all-day banners vs timed-by-column.
@@ -623,10 +653,12 @@ The now-line element is rendered **only** in the today day-column (per FR-2.10 a
 ### 6.5 `src/calendar-card-pro.ts` modifications
 
 New reactive state:
+
 - `@property({ attribute: false }) viewOffsetDays = 0;`
-- `@property({ attribute: false }) visibleDays: 1 | 3 | 7 = 7;` *(initial value; corrected in `connectedCallback`)*
+- `@property({ attribute: false }) visibleDays: 1 | 3 | 7 = 7;` _(initial value; corrected in `connectedCallback`)_
 
 New private state:
+
 - `private _resizeObserver?: ResizeObserver;`
 - `private _resizeRafId?: number;`
 - `private _nowLineIntervalId?: number;`
@@ -790,16 +822,21 @@ if (this.isInitialLoad) {
   content = Render.renderCardContent('loading', this.effectiveLanguage);
 } else if (!this.safeHass || !this.config.entities.length) {
   content = Render.renderCardContent('error', this.effectiveLanguage);
-} else if (this.config.view === 'time-grid') {                      // NEW BRANCH
+} else if (this.config.view === 'time-grid') {
+  // NEW BRANCH
   content = RenderGrid.renderTimeGrid(
-    this.events, this.config, this.effectiveLanguage,
+    this.events,
+    this.config,
+    this.effectiveLanguage,
     {
       visibleDays: this.visibleDays,
       offsetDays: this.viewOffsetDays,
       now: new Date(),
       onShiftDay: (d) => this._shiftDays(d),
       onShiftWindow: (d) => this._shiftDays(d * this.visibleDays),
-      onResetToToday: () => { this.viewOffsetDays = this._todayOffset(); },
+      onResetToToday: () => {
+        this.viewOffsetDays = this._todayOffset();
+      },
       canShiftBack: this.viewOffsetDays > 0,
       canShiftForward: this.viewOffsetDays < this._maxOffset(),
     },
@@ -866,21 +903,25 @@ export async function fetchEventData(
   config: Types.Config,
   instanceId: string,
   force = false,
-  effectiveDaysToShow?: number,    // NEW
+  effectiveDaysToShow?: number, // NEW
 ): Promise<Types.CalendarEventData[]> {
   const daysToShow = effectiveDaysToShow ?? config.days_to_show;
 
   const cacheKey = getBaseCacheKey(
-    instanceId, config.entities, daysToShow,    // CHANGED
-    config.show_past_events, config.start_date, config.filter_duplicates,
+    instanceId,
+    config.entities,
+    daysToShow, // CHANGED
+    config.show_past_events,
+    config.start_date,
+    config.filter_duplicates,
   );
   // ... same caching logic ...
 
-  const timeWindow = getTimeWindow(daysToShow, config.start_date);   // CHANGED
+  const timeWindow = getTimeWindow(daysToShow, config.start_date); // CHANGED
   // ... same fetch ...
 
   const limitDate = new Date(referenceDate);
-  limitDate.setDate(limitDate.getDate() + daysToShow);                // CHANGED
+  limitDate.setDate(limitDate.getDate() + daysToShow); // CHANGED
   // ... same filter ...
 }
 ```
@@ -891,16 +932,15 @@ The list view path is unaffected (calls `fetchEventData(hass, config, instanceId
 
 ```ts
 // In updateEvents, before calling fetchEventData:
-const effectiveDays = this.config.view === 'time-grid'
-  ? this.config.time_grid_navigation_days
-  : undefined;
+const effectiveDays =
+  this.config.view === 'time-grid' ? this.config.time_grid_navigation_days : undefined;
 
 const eventData = await EventUtils.fetchEventData(
   this.safeHass,
   this.config,
   this._instanceId,
   force,
-  effectiveDays,   // NEW — undefined for list view (preserves existing behavior)
+  effectiveDays, // NEW — undefined for list view (preserves existing behavior)
 );
 ```
 
@@ -919,22 +959,34 @@ Appended to `src/rendering/styles.ts`. All new selectors are scoped to `.ccp-gri
 }
 
 .ccp-grid-nav {
-  display: flex; align-items: center; gap: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
   padding: 4px 8px;
 }
 .ccp-grid-nav button {
-  background: transparent; border: 0; cursor: pointer;
-  padding: 4px 8px; border-radius: 4px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
   color: var(--calendar-card-color-event);
 }
-.ccp-grid-nav button[aria-disabled="true"] { opacity: 0.4; cursor: not-allowed; }
+.ccp-grid-nav button[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 .ccp-grid-nav button:focus-visible {
   outline: 2px solid var(--calendar-card-line-color-vertical);
 }
-.ccp-grid-range { margin-left: auto; font-size: var(--calendar-card-font-size-event); }
+.ccp-grid-range {
+  margin-left: auto;
+  font-size: var(--calendar-card-font-size-event);
+}
 
 /* grid-template-columns set inline via styleMap by the renderer */
-.ccp-grid-headers, .ccp-grid-allday {
+.ccp-grid-headers,
+.ccp-grid-allday {
   display: grid;
 }
 
@@ -970,7 +1022,8 @@ Appended to `src/rendering/styles.ts`. All new selectors are scoped to `.ccp-gri
 }
 .ccp-grid-allday-banner {
   border-radius: var(--calendar-card-grid-event-radius, 4px);
-  padding: 2px 6px; margin: 1px;
+  padding: 2px 6px;
+  margin: 1px;
   /* background-color set inline via styleMap (accent at event_background_opacity);
      grid-column-start / grid-column-end also set inline */
   border-inline-start: 2px solid var(--calendar-card-line-color-vertical);
@@ -985,11 +1038,14 @@ Appended to `src/rendering/styles.ts`. All new selectors are scoped to `.ccp-gri
   font-size: var(--calendar-card-font-size-event);
   overflow: hidden;
 }
-.ccp-grid-event.past-event { opacity: 0.55; }
+.ccp-grid-event.past-event {
+  opacity: 0.55;
+}
 
 .ccp-grid-now-line {
   position: absolute;
-  left: 0; right: 0;     /* NB: positioning context is the today day-column, not body */
+  left: 0;
+  right: 0; /* NB: positioning context is the today day-column, not body */
   height: 2px;
   background: var(--calendar-card-grid-now-line-color, var(--calendar-card-line-color-vertical));
   pointer-events: none;
@@ -997,14 +1053,20 @@ Appended to `src/rendering/styles.ts`. All new selectors are scoped to `.ccp-gri
 }
 
 .ccp-grid-hidden-pill {
-  position: absolute; top: 2px; left: 2px; right: 2px;
-  font-size: 10px; opacity: 0.7; text-align: center;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  right: 2px;
+  font-size: 10px;
+  opacity: 0.7;
+  text-align: center;
 }
 ```
 
 The now-line's `left: 0; right: 0` correctly spans only its parent (`.ccp-grid-day-column.today`), since that's the absolute-positioning context.
 
 **Layout summary** (resolves F-1):
+
 - `.ccp-grid` — vertical flex container; the whole grid scrolls if `max_height` is set.
 - `.ccp-grid-nav` — flex row above everything.
 - `.ccp-grid-headers` — CSS grid: `[axis-width] [N day cells]` (inline `grid-template-columns`).
@@ -1017,6 +1079,7 @@ The now-line's `left: 0; right: 0` correctly spans only its parent (`.ccp-grid-d
 ### 6.7 Event splitting and grouping
 
 Grid view always splits multi-day events at midnight via `splitTimedEventByDay` in `utils/grid.ts`. Differences from `events.ts:splitMultiDayEvent` (which we do **not** reuse):
+
 1. Middle days remain timed (00:00–24:00), not all-day segments.
 2. Zero-duration segments (events ending exactly at midnight) are dropped.
 
@@ -1026,18 +1089,18 @@ Reference date and past-event detection are replicated in `utils/grid.ts` to avo
 
 ## 7. Interaction with existing features
 
-| Existing feature | Interaction |
-|---|---|
-| `days_to_show` | **Hidden** in editor when `view: time-grid` (grid view uses `time_grid_navigation_days` instead). `hasConfigChanged` ignores `days_to_show` mutations when `view: time-grid` (avoids wasted refetches). YAML users can still set it; it just has no effect on grid view. |
-| `compact_events_to_show` / `compact_days_to_show` | Not applied in grid view. Editor hides them when `view = time-grid`. |
-| `show_empty_days` | Not applied. Grid always shows N columns. |
-| `show_week_numbers` | Not applied (visual conflict with column layout). Deferred. |
-| `today_indicator` | **Not currently applied** in grid view. Today is highlighted via (a) the now-line on today's column, and (b) a `today` class on today's day-column header (CSS bold + accent border). The list-view-specific `today_indicator` styles (`dot`, `pulse`, etc.) are unrelated to grid layout. May be revisited in a follow-up if users request it. |
-| `tap_action` / `hold_action` | Bypassed inside nav buttons (`stopPropagation`). Other parts of the grid still respect card-level actions. **`tap_action: 'expand'`** (default for compact mode in list view) is a **no-op** in grid view because `isExpanded` only affects list-view's compact-mode behavior. Users with this action set will see no visible change on tap; documented in README. |
-| `weather` | **Deferred entirely in v1**: weather forecasts are not shown in grid view (neither in banners nor timed events). Adding weather is a follow-up feature; existing list-view weather logic is too tightly coupled to per-event title-rendering to reuse cleanly. |
-| `refresh_interval` | Unchanged — periodic refetch refreshes the in-memory `events` array, which the grid then re-renders. |
-| `card-mod` | Grid uses CSS classes prefixed `ccp-grid-*`. **Card-mod note:** the now-line position is updated imperatively (not via Lit re-render), so card-mod users targeting `.ccp-grid-now-line` will see their CSS preserved across updates. Other DOM mutations made by card-mod *will* be replaced on Lit re-renders, same as today. |
-| `split_multiday_events` (config) | Ignored in grid view (always splits). |
+| Existing feature                                  | Interaction                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `days_to_show`                                    | **Hidden** in editor when `view: time-grid` (grid view uses `time_grid_navigation_days` instead). `hasConfigChanged` ignores `days_to_show` mutations when `view: time-grid` (avoids wasted refetches). YAML users can still set it; it just has no effect on grid view.                                                                                           |
+| `compact_events_to_show` / `compact_days_to_show` | Not applied in grid view. Editor hides them when `view = time-grid`.                                                                                                                                                                                                                                                                                               |
+| `show_empty_days`                                 | Not applied. Grid always shows N columns.                                                                                                                                                                                                                                                                                                                          |
+| `show_week_numbers`                               | Not applied (visual conflict with column layout). Deferred.                                                                                                                                                                                                                                                                                                        |
+| `today_indicator`                                 | **Not currently applied** in grid view. Today is highlighted via (a) the now-line on today's column, and (b) a `today` class on today's day-column header (CSS bold + accent border). The list-view-specific `today_indicator` styles (`dot`, `pulse`, etc.) are unrelated to grid layout. May be revisited in a follow-up if users request it.                    |
+| `tap_action` / `hold_action`                      | Bypassed inside nav buttons (`stopPropagation`). Other parts of the grid still respect card-level actions. **`tap_action: 'expand'`** (default for compact mode in list view) is a **no-op** in grid view because `isExpanded` only affects list-view's compact-mode behavior. Users with this action set will see no visible change on tap; documented in README. |
+| `weather`                                         | **Deferred entirely in v1**: weather forecasts are not shown in grid view (neither in banners nor timed events). Adding weather is a follow-up feature; existing list-view weather logic is too tightly coupled to per-event title-rendering to reuse cleanly.                                                                                                     |
+| `refresh_interval`                                | Unchanged — periodic refetch refreshes the in-memory `events` array, which the grid then re-renders.                                                                                                                                                                                                                                                               |
+| `card-mod`                                        | Grid uses CSS classes prefixed `ccp-grid-*`. **Card-mod note:** the now-line position is updated imperatively (not via Lit re-render), so card-mod users targeting `.ccp-grid-now-line` will see their CSS preserved across updates. Other DOM mutations made by card-mod _will_ be replaced on Lit re-renders, same as today.                                     |
+| `split_multiday_events` (config)                  | Ignored in grid view (always splits).                                                                                                                                                                                                                                                                                                                              |
 
 ## 8. Acceptance criteria as test specs (Given/When/Then)
 
@@ -1330,7 +1393,7 @@ Spec G-pastEventsFilter (FR-2.11 show_past_events):
   THEN ALL four events render (timed past dimmed via past-event class)
 
 Spec G-getCardSize (FR-10.1):
-  WHEN config.view='list' THEN getCardSize() === 3
+  WHEN config.view='list' THEN getCardSize() === 1   // matches HA's default-when-undefined; list view did not previously implement getCardSize so this preserves existing masonry behavior (Rule 5)
   WHEN config = {view:'time-grid', start_hour:6, end_hour:22, interval:30}
    THEN getCardSize() === 17  // ceil((16*2*24 + 80) / 50) = ceil(848/50) = ceil(16.96)
   WHEN config = above + max_height='400px'
@@ -1347,45 +1410,47 @@ Spec G-getRefDate (utils/grid.ts:getReferenceDate):
 
 ## 9. Risks and mitigations
 
-| # | Risk | Likelihood | Impact | Mitigation |
-|---|---|---|---|---|
-| R-1 | DST-crossing events mis-render duration (rare; only events that span the 02:00→03:00 spring-forward) | Low | Low | Spec for an event crossing spring-forward boundary; document local-tz behavior |
-| R-2 | Initial width measurement returns 0 if connectedCallback fires before parent layout | Low | Low | `this.offsetWidth` forces synchronous layout. Worst case: brief layout flash on the first frame |
-| R-3 | Existing list view regresses due to shared style additions | Low | High | New CSS scoped to `.ccp-grid*`; no existing rule modified; code review |
-| R-4 | Editor breaks YAML-only configs | Very Low | Low | New fields are optional; `setConfig` merges defaults; **breakpoints flattened to scalars** to avoid shallow-merge data loss (C-1) |
-| R-5 | Bundle size inflation | Low | Low | Track `dist/calendar-card-pro.js` byte size; cap +20 KB |
-| R-6 | Now-line interval leaks across disconnects | Low | Med | `disconnectedCallback` clears interval; visibility-change `'hidden'` pause |
-| R-7 | `customElements.define` collisions in dev | Low | Low | `@customElement` decorator handles it |
-| R-8 | YAML with unknown `view` value crashes | Very Low | Low | Validate in `setConfig`; coerce to `'list'` (FR-1.4) |
-| R-9 | Timed events crossing midnight render as all-day banners | (eliminated) | — | Use `splitTimedEventByDay` (preserves timed semantics) |
-| R-10 | A11y regression: keyboard nav, focus states | Med | Med | ARIA labels on nav buttons; `:focus-visible` outline; `aria-disabled` for inactive buttons |
-| R-11 | Masonry view distributes the card poorly without `getCardSize` | Med | Low | Add `getCardSize()` (FR-10.1). Section view is unaffected (default is full-width natural-height) |
-| R-12 | Now-line spans all columns instead of today only | (eliminated) | — | Line is rendered inside the today day-column with `left:0; right:0` relative to that column (C-4 fix) |
-| R-13 | Time axis misaligns with day columns | (eliminated in v4) | — | `.ccp-grid-body` is itself a 2-column grid (axis-width + 1fr). Day-columns area starts at the same x-coordinate as the headers' day cells (F-1 fix) |
-| R-14 | `Today` button doesn't navigate to today when `start_date` is configured to a non-today value | (eliminated in v4) | — | `_todayOffset()` computes today's offset within the fetch window (F-8 fix) |
-| R-15 | Initial render flashes N=1 then N=cap when `offsetWidth` is 0 (hidden tab, etc.) | Low | Low | `chooseVisibleDays` returns `cap` for `width === 0` only (real tiny widths return N=1) (v4-F1 fix) |
-| R-16 | Cross-timezone display: events created in HA's TZ may appear at unexpected times in browser's TZ | Low | Low | Existing list-view behavior; documented in README. Not a regression |
-| R-17 | All-day banner contrast against `event_color` text on dark themes when `event_background_opacity > 0` | (eliminated in v5) | — | Banner has its own `time_grid_allday_bg_opacity` config (default 0.2), independent of list-view's `event_background_opacity` (v4-F3 fix) |
-| R-18 | Slot-height inconsistency between renderer / host / `getCardSize` if user overrides via card-mod | (eliminated in v5) | — | Slot height is a code constant `SLOT_HEIGHT_PX = 24`, not a CSS variable (v4-F9 fix) |
-| R-19 | All-day banners that start before / end after visible window render incorrectly (column 1 = axis) | (eliminated in v5) | — | Banner placement clamps `dayIdx` and `numDays`; `◂`/`▸` overflow indicators added (v4-F6 fix) |
-| R-20 | Nested scroll containers when `.ccp-grid` has `overflow-y: auto` and parent `.content-container` does too | (eliminated in v5) | — | `.ccp-grid` has no overflow setting; parent handles scroll (v4-F5 fix) |
-| R-21 | In 7-day mode, single-step `<`/`>` buttons appear to do nothing because the window snaps to week boundaries | (eliminated in v5) | — | Single-step buttons hidden in N=7 mode; only `<<`/`>>` and `Today` shown (v4-F10 fix) |
-| R-22 | `Today` button is a no-op when `start_date` is configured to a future date | Low | Low | User explicit configuration. Today's offset clamps to 0 (window start). Documented; not a regression. |
-| R-23 | Hour-24 edge case (when `end_hour: 24`) produces invalid label or duplicate "12 PM" | (eliminated in v8) | — | Labels rendered at hours `[start_hour, end_hour-1]`, never at `end_hour` (v7-F4/F5 fix) |
-| R-24 | `show_past_events: false` ignored in grid view, leading to inconsistent UX with list view | (eliminated in v8) | — | Renderer filters past events when `show_past_events === false`, mirroring `events.ts:168-172` (v7-F7 fix) |
-| R-25 | `days_to_show` change in grid mode triggers wasted refetch | (eliminated in v8) | — | `hasConfigChanged` ignores `days_to_show` when `view: time-grid` (v7-F8 fix) |
+| #    | Risk                                                                                                        | Likelihood         | Impact | Mitigation                                                                                                                                                                   |
+| ---- | ----------------------------------------------------------------------------------------------------------- | ------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R-1  | DST-crossing events mis-render duration (rare; only events that span the 02:00→03:00 spring-forward)        | Low                | Low    | Spec for an event crossing spring-forward boundary; document local-tz behavior                                                                                               |
+| R-2  | Initial width measurement returns 0 if connectedCallback fires before parent layout                         | Low                | Low    | `this.offsetWidth` forces synchronous layout. Worst case: brief layout flash on the first frame                                                                              |
+| R-3  | Existing list view regresses due to shared style additions                                                  | Low                | High   | New CSS scoped to `.ccp-grid*`; no existing rule modified; code review                                                                                                       |
+| R-4  | Editor breaks YAML-only configs                                                                             | Very Low           | Low    | New fields are optional; `setConfig` merges defaults; **breakpoints flattened to scalars** to avoid shallow-merge data loss (C-1)                                            |
+| R-5  | Bundle size inflation                                                                                       | Low                | Low    | Track `dist/calendar-card-pro.js` byte size; cap +25 KB (raised from +20 KB in worklog 0020 after FR-2.6 implementation, validation, controllers, and a11y fixes were added) |
+| R-6  | Now-line interval leaks across disconnects                                                                  | Low                | Med    | `disconnectedCallback` clears interval; visibility-change `'hidden'` pause                                                                                                   |
+| R-7  | `customElements.define` collisions in dev                                                                   | Low                | Low    | `@customElement` decorator handles it                                                                                                                                        |
+| R-8  | YAML with unknown `view` value crashes                                                                      | Very Low           | Low    | Validate in `setConfig`; coerce to `'list'` (FR-1.4)                                                                                                                         |
+| R-9  | Timed events crossing midnight render as all-day banners                                                    | (eliminated)       | —      | Use `splitTimedEventByDay` (preserves timed semantics)                                                                                                                       |
+| R-10 | A11y regression: keyboard nav, focus states                                                                 | Med                | Med    | ARIA labels on nav buttons; `:focus-visible` outline; `aria-disabled` for inactive buttons                                                                                   |
+| R-11 | Masonry view distributes the card poorly without `getCardSize`                                              | Med                | Low    | Add `getCardSize()` (FR-10.1). Section view is unaffected (default is full-width natural-height)                                                                             |
+| R-12 | Now-line spans all columns instead of today only                                                            | (eliminated)       | —      | Line is rendered inside the today day-column with `left:0; right:0` relative to that column (C-4 fix)                                                                        |
+| R-13 | Time axis misaligns with day columns                                                                        | (eliminated in v4) | —      | `.ccp-grid-body` is itself a 2-column grid (axis-width + 1fr). Day-columns area starts at the same x-coordinate as the headers' day cells (F-1 fix)                          |
+| R-14 | `Today` button doesn't navigate to today when `start_date` is configured to a non-today value               | (eliminated in v4) | —      | `_todayOffset()` computes today's offset within the fetch window (F-8 fix)                                                                                                   |
+| R-15 | Initial render flashes N=1 then N=cap when `offsetWidth` is 0 (hidden tab, etc.)                            | Low                | Low    | `chooseVisibleDays` returns `cap` for `width === 0` only (real tiny widths return N=1) (v4-F1 fix)                                                                           |
+| R-16 | Cross-timezone display: events created in HA's TZ may appear at unexpected times in browser's TZ            | Low                | Low    | Existing list-view behavior; documented in README. Not a regression                                                                                                          |
+| R-17 | All-day banner contrast against `event_color` text on dark themes when `event_background_opacity > 0`       | (eliminated in v5) | —      | Banner has its own `time_grid_allday_bg_opacity` config (default 0.2), independent of list-view's `event_background_opacity` (v4-F3 fix)                                     |
+| R-18 | Slot-height inconsistency between renderer / host / `getCardSize` if user overrides via card-mod            | (eliminated in v5) | —      | Slot height is a code constant `SLOT_HEIGHT_PX = 24`, not a CSS variable (v4-F9 fix)                                                                                         |
+| R-19 | All-day banners that start before / end after visible window render incorrectly (column 1 = axis)           | (eliminated in v5) | —      | Banner placement clamps `dayIdx` and `numDays`; `◂`/`▸` overflow indicators added (v4-F6 fix)                                                                                |
+| R-20 | Nested scroll containers when `.ccp-grid` has `overflow-y: auto` and parent `.content-container` does too   | (eliminated in v5) | —      | `.ccp-grid` has no overflow setting; parent handles scroll (v4-F5 fix)                                                                                                       |
+| R-21 | In 7-day mode, single-step `<`/`>` buttons appear to do nothing because the window snaps to week boundaries | (eliminated in v5) | —      | Single-step buttons hidden in N=7 mode; only `<<`/`>>` and `Today` shown (v4-F10 fix)                                                                                        |
+| R-22 | `Today` button is a no-op when `start_date` is configured to a future date                                  | Low                | Low    | User explicit configuration. Today's offset clamps to 0 (window start). Documented; not a regression.                                                                        |
+| R-23 | Hour-24 edge case (when `end_hour: 24`) produces invalid label or duplicate "12 PM"                         | (eliminated in v8) | —      | Labels rendered at hours `[start_hour, end_hour-1]`, never at `end_hour` (v7-F4/F5 fix)                                                                                      |
+| R-24 | `show_past_events: false` ignored in grid view, leading to inconsistent UX with list view                   | (eliminated in v8) | —      | Renderer filters past events when `show_past_events === false`, mirroring `events.ts:168-172` (v7-F7 fix)                                                                    |
+| R-25 | `days_to_show` change in grid mode triggers wasted refetch                                                  | (eliminated in v8) | —      | `hasConfigChanged` ignores `days_to_show` when `view: time-grid` (v7-F8 fix)                                                                                                 |
 
 ## 10. Test plan
 
 The codebase has no test runner. We add Vitest as a single dev dependency.
 
 We **do not** snapshot Lit `TemplateResult`s. Lit SSR is not a current dependency, and bringing it in for one snapshot is heavyweight. List-view non-regression is guaranteed by:
+
 1. The dispatch in `render()` only routes to `RenderGrid.renderTimeGrid` when `config.view === 'time-grid'`.
 2. The list-view branch is unchanged byte-for-byte.
 3. No edits to `src/rendering/render.ts` (apart from no edits at all).
 4. The single edit to `src/utils/events.ts` is **additive only**: an optional 5th argument to `fetchEventData`. The list view doesn't pass it; behavior is unchanged.
 
 What we don't test automatically:
+
 - Lit rendering of the editor (would require `jsdom` + HA stubs).
 - The actual `ResizeObserver` callback path.
 - The HA `callApi` request flow.
@@ -1453,18 +1518,19 @@ Total: roughly 30+ test cases. (Exact count locked at implementation time.)
   "vitest": "^2.1.0"
 }
 ```
+
 No new runtime dependencies. CI integration is a follow-up.
 
 ## 11. Open questions
 
-| # | Question | Resolution |
-|---|---|---|
-| OQ-1 | (closed) How to snapshot Lit `TemplateResult`? | We don't. Non-regression rests on the dispatch guard and no-edit policy. |
-| OQ-2 | (closed) Should `view: 'time-grid'` lock `days_to_show ≥ 7`? | No. `time_grid_navigation_days` (default 28) decouples grid navigation from `days_to_show`. |
-| OQ-3 | (closed) Should we implement `getCardSize()`? | Yes, in this PR. (Not `getGridOptions` — section view is fine without it.) |
-| OQ-4 | When `view: 'time-grid'` and `entities: []`, render a friendly empty-state? | Fall through to existing error state (acknowledgment of inherited behavior). |
-| OQ-5 | Localized labels for nav buttons | Add 5 keys: `time_grid_today`, `time_grid_prev_day_aria`, `time_grid_next_day_aria`, `time_grid_prev_window_aria`, `time_grid_next_window_aria`. |
-| OQ-6 | Surface `view: 'time-grid'` in `getStubConfig` and HACS preview | Out of scope — separate PR. |
+| #    | Question                                                                    | Resolution                                                                                                                                       |
+| ---- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| OQ-1 | (closed) How to snapshot Lit `TemplateResult`?                              | We don't. Non-regression rests on the dispatch guard and no-edit policy.                                                                         |
+| OQ-2 | (closed) Should `view: 'time-grid'` lock `days_to_show ≥ 7`?                | No. `time_grid_navigation_days` (default 28) decouples grid navigation from `days_to_show`.                                                      |
+| OQ-3 | (closed) Should we implement `getCardSize()`?                               | Yes, in this PR. (Not `getGridOptions` — section view is fine without it.)                                                                       |
+| OQ-4 | When `view: 'time-grid'` and `entities: []`, render a friendly empty-state? | Fall through to existing error state (acknowledgment of inherited behavior).                                                                     |
+| OQ-5 | Localized labels for nav buttons                                            | Add 5 keys: `time_grid_today`, `time_grid_prev_day_aria`, `time_grid_next_day_aria`, `time_grid_prev_window_aria`, `time_grid_next_window_aria`. |
+| OQ-6 | Surface `view: 'time-grid'` in `getStubConfig` and HACS preview             | Out of scope — separate PR.                                                                                                                      |
 
 ## 12. Implementation phasing
 
@@ -1486,7 +1552,7 @@ This is one PR but split into reviewable commits:
 
 - All FRs in §4 are implemented and either covered by Vitest specs (§10.1) or the manual checklist (§10.2).
 - `npm run lint` passes with no warnings or errors.
-- `npm run build` succeeds. Bundle size delta ≤ +20 KB.
+- `npm run build` succeeds. Bundle size delta ≤ +25 KB minified.
 - `npm test` passes (new).
 - List-view paths in `src/rendering/render.ts` are unchanged (zero edits).
 - The edit to `src/utils/events.ts` is additive only (one optional argument; existing callers unaffected).

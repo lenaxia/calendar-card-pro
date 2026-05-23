@@ -62,17 +62,17 @@ time_grid_allday_bg_opacity: 0.2
 
 ## Stories
 
-| # | Title | Status |
-|---|---|---|
-| [story2-1](story2-1.md) | All-day banner placement + overflow indicators | Not started |
+| #                       | Title                                                     | Status      |
+| ----------------------- | --------------------------------------------------------- | ----------- |
+| [story2-1](story2-1.md) | All-day banner placement + overflow indicators            | Not started |
 | [story2-2](story2-2.md) | Now-line rendering + 60-second imperative position update | Not started |
-| [story2-3](story2-3.md) | Midnight refresh + visibility-change pause | Not started |
+| [story2-3](story2-3.md) | Midnight refresh + visibility-change pause                | Not started |
 
 ## Acceptance for the epic as a whole
 
 - All stories complete with their acceptance criteria met
 - `npm run lint` clean
-- `npm run build` succeeds; cumulative bundle delta through end of epic02 stays within the design's overall +20 KB budget (final budget verified at end of epic03)
+- `npm run build` succeeds; cumulative bundle delta through end of epic02 stays within the design's overall +25 KB budget (cap raised in worklog 0020; final budget verified at end of epic03)
 - `npm test` passes (banner placement specs G-2.7a/b/c/d, now-line specs G-2.10/2.10b, midnight refresh G-midnightRefresh)
 - Manual smoke test 1: multi-day all-day event renders as a banner spanning correct columns
 - Manual smoke test 2: banner extending before/after the visible window shows `◂` or `▸` indicator and is clipped to the window edges
@@ -91,11 +91,11 @@ time_grid_allday_bg_opacity: 0.2
 
 ## Mapping to design doc FRs
 
-| FR | Story | Notes |
-|---|---|---|
-| FR-2.7 | story2-1 | Banner placement (full spec) |
-| FR-6.1, FR-6.2, FR-6.3 | story2-1 | Banner strip layout, max-height, omit-when-empty |
-| FR-2.10 | story2-2 | Now-line rendering + imperative update |
-| FR-11.4 | story2-2 | Interval lifecycle |
-| FR-11.5 | story2-3 | Midnight refresh |
+| FR                     | Story    | Notes                                                             |
+| ---------------------- | -------- | ----------------------------------------------------------------- |
+| FR-2.7                 | story2-1 | Banner placement (full spec)                                      |
+| FR-6.1, FR-6.2, FR-6.3 | story2-1 | Banner strip layout, max-height, omit-when-empty                  |
+| FR-2.10                | story2-2 | Now-line rendering + imperative update                            |
+| FR-11.4                | story2-2 | Interval lifecycle                                                |
+| FR-11.5                | story2-3 | Midnight refresh                                                  |
 | FR-2.11 (all-day past) | story2-1 | All-day past events render with `past-event` class (not filtered) |

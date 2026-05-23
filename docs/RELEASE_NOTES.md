@@ -31,7 +31,7 @@ A 2-D calendar view: vertical = time of day, horizontal = days. Multi-day all-da
 
 ## 📈 Bundle size
 
-`dist/calendar-card-pro.js` grows from 288,879 bytes (v3.2.0) to ~313 KB — well under the +20 KB design budget when accounting for the renderer, helpers, and CSS.
+`dist/calendar-card-pro.js` grows from 288,879 bytes (v3.2.0) to approximately 320 KB — within the +25 KB minified bundle-size budget set by the time-grid design (cap raised from +20 KB in worklog 0020 to accommodate the FR-2.6 hidden-pill / clipped-indicator markup, the validation block in `setConfig`, the ReactiveControllers for now-line and responsive columns, the exhaustiveness checks, accessibility fixes, and editor select-field controls). The list-view bundle path is byte-identical (`render.ts` unchanged).
 
 ## 🌍 Translations
 

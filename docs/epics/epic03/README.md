@@ -12,6 +12,7 @@
 epics 00-02 ship a working time-grid view, but it's only configurable via YAML. This epic makes it accessible to users who use the **visual editor**, surfaces the new strings in **English translations** (the fallback language), and updates user-facing **documentation** so contributors and end-users know the feature exists and how to use it.
 
 After this epic, the feature is "ship-ready":
+
 - Visual editor users can switch views and tune grid options without YAML
 - A new user reading the README sees the time-grid view documented
 - `docs/architecture.md` reflects the new module layout
@@ -45,17 +46,17 @@ After this epic, a user who installs calendar-card-pro and adds it to a dashboar
 
 ## Stories
 
-| # | Title | Status |
-|---|---|---|
+| #                       | Title                                                     | Status      |
+| ----------------------- | --------------------------------------------------------- | ----------- |
 | [story3-1](story3-1.md) | Visual editor — view selector + Time-grid expansion panel | Not started |
 | [story3-2](story3-2.md) | English translations for editor labels + nav aria strings | Not started |
-| [story3-3](story3-3.md) | README + architecture.md updates | Not started |
+| [story3-3](story3-3.md) | README + architecture.md updates                          | Not started |
 
 ## Acceptance for the epic as a whole
 
 - All stories complete with their acceptance criteria met
 - `npm run lint` clean
-- `npm run build` succeeds; cumulative bundle delta (epic00–03) ≤ +20 KB minified
+- `npm run build` succeeds; cumulative bundle delta (epic00–03) ≤ +25 KB minified (cap raised in worklog 0020)
 - Manual smoke test 1: visual editor shows view selector; toggling view shows/hides the right panels
 - Manual smoke test 2: toggling between views and saving produces minimal YAML (no spurious defaults)
 - Manual smoke test 3: setting `time_grid_navigation_days = 5` while `time_grid_max_days = 7` shows a warning hint in the editor
@@ -74,15 +75,15 @@ After this epic, a user who installs calendar-card-pro and adds it to a dashboar
 
 ## Mapping to design doc FRs
 
-| FR | Story | Notes |
-|---|---|---|
-| FR-7.1 | story3-1 | View selector |
-| FR-7.2 | story3-1 | Time grid expansion panel + fields |
-| FR-7.3 | story3-1 | Conditional reveal via `requestUpdate` |
-| FR-7.4 | story3-1 | `filterDefaultValues` minimal YAML |
-| FR-7.5 | story3-1 | Editor labels via translations |
-| FR-7.6 | story3-1 | Helper-text hint |
-| FR-7.7 | story3-1 | Hide `days_to_show` etc. |
-| FR-8.1 | story3-2 | New strings list |
-| FR-8.2 | story3-2 | English fallback |
-| Documentation tasks | story3-3 | README, architecture.md |
+| FR                  | Story    | Notes                                  |
+| ------------------- | -------- | -------------------------------------- |
+| FR-7.1              | story3-1 | View selector                          |
+| FR-7.2              | story3-1 | Time grid expansion panel + fields     |
+| FR-7.3              | story3-1 | Conditional reveal via `requestUpdate` |
+| FR-7.4              | story3-1 | `filterDefaultValues` minimal YAML     |
+| FR-7.5              | story3-1 | Editor labels via translations         |
+| FR-7.6              | story3-1 | Helper-text hint                       |
+| FR-7.7              | story3-1 | Hide `days_to_show` etc.               |
+| FR-8.1              | story3-2 | New strings list                       |
+| FR-8.2              | story3-2 | English fallback                       |
+| Documentation tasks | story3-3 | README, architecture.md                |

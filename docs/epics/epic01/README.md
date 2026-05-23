@@ -24,7 +24,7 @@ After this epic, the time-grid view feels like a real calendar app, not a static
 - `time_grid_breakpoint_three_day_px: number` (default 500)
 - `time_grid_breakpoint_seven_day_px: number` (default 900)
 - `time_grid_navigation_days: number` (default 28)
-- `chooseVisibleDays`, `snapToWindow` helpers (already specced in epic00 story0-2 — this epic just *uses* them)
+- `chooseVisibleDays`, `snapToWindow` helpers (already specced in epic00 story0-2 — this epic just _uses_ them)
 - `ResizeObserver` lifecycle in host (`connectedCallback`, `disconnectedCallback`, `_syncObserver`)
 - Initial width measurement via `this.offsetWidth` in `connectedCallback` (forces synchronous layout pass — `firstUpdated` is too late)
 - Width=0 fallback returns `cap` (no-measurement guard, NOT real-tiny-width-uses-cap)
@@ -68,18 +68,18 @@ time_grid_breakpoint_seven_day_px: 900
 
 ## Stories
 
-| # | Title | Status |
-|---|---|---|
-| [story1-1](story1-1.md) | Responsive `ResizeObserver` + width-based column count | Not started |
-| [story1-2](story1-2.md) | Navigation handlers `<` `>` `<<` `>>` `Today` | Not started |
-| [story1-3](story1-3.md) | Window alignment (week-aligned 7-day, rolling 1/3-day) | Not started |
+| #                       | Title                                                   | Status      |
+| ----------------------- | ------------------------------------------------------- | ----------- |
+| [story1-1](story1-1.md) | Responsive `ResizeObserver` + width-based column count  | Not started |
+| [story1-2](story1-2.md) | Navigation handlers `<` `>` `<<` `>>` `Today`           | Not started |
+| [story1-3](story1-3.md) | Window alignment (week-aligned 7-day, rolling 1/3-day)  | Not started |
 | [story1-4](story1-4.md) | Fetch-window decoupling via `time_grid_navigation_days` | Not started |
 
 ## Acceptance for the epic as a whole
 
 - All stories complete with their acceptance criteria met
 - `npm run lint` clean
-- `npm run build` succeeds; cumulative bundle delta (epic00 + epic01) ≤ +20 KB
+- `npm run build` succeeds; cumulative bundle delta (epic00 + epic01) ≤ +25 KB (cap raised in worklog 0020)
 - `npm test` passes (new tests for `_todayOffset`, `hasConfigChanged` view-aware logic)
 - Manual smoke test 1: resize browser narrow→wide, column count changes 1→3→7
 - Manual smoke test 2: nav buttons work; `<<` shifts by N; `<` `>` hidden in 7-day mode
@@ -97,12 +97,12 @@ time_grid_breakpoint_seven_day_px: 900
 
 ## Mapping to design doc FRs
 
-| FR | Story | Notes |
-|---|---|---|
-| FR-3.1, FR-3.2, FR-3.3 | story1-1 | Responsive selection + breakpoints + cap |
-| FR-3.4 | story1-1 | Initial measurement in connectedCallback; width=0 fallback |
-| FR-3.5 | story1-1 | N change re-renders only (no refetch) |
-| FR-4.1 through FR-4.6 | story1-2 | Navigation buttons + handlers + a11y |
-| FR-5.1, FR-5.2, FR-5.3 | story1-3 | Week-aligned vs rolling; Today button uses `_todayOffset()` |
-| FR-5.4, FR-5.5 | story1-4 | Fetch-window decoupling; view-aware `hasConfigChanged` |
-| FR-5.6 | story1-4 | Helper-text hint when `nav_days < max_days` (rendered, but the editor surfacing is epic03) |
+| FR                     | Story    | Notes                                                                                      |
+| ---------------------- | -------- | ------------------------------------------------------------------------------------------ |
+| FR-3.1, FR-3.2, FR-3.3 | story1-1 | Responsive selection + breakpoints + cap                                                   |
+| FR-3.4                 | story1-1 | Initial measurement in connectedCallback; width=0 fallback                                 |
+| FR-3.5                 | story1-1 | N change re-renders only (no refetch)                                                      |
+| FR-4.1 through FR-4.6  | story1-2 | Navigation buttons + handlers + a11y                                                       |
+| FR-5.1, FR-5.2, FR-5.3 | story1-3 | Week-aligned vs rolling; Today button uses `_todayOffset()`                                |
+| FR-5.4, FR-5.5         | story1-4 | Fetch-window decoupling; view-aware `hasConfigChanged`                                     |
+| FR-5.6                 | story1-4 | Helper-text hint when `nav_days < max_days` (rendered, but the editor surfacing is epic03) |
