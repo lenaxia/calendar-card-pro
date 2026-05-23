@@ -298,6 +298,10 @@ class CalendarCardPro extends LitElement {
         }
       }
     }
+
+    if (this.config?.view === 'time-grid') {
+      this._lastRenderDay = Grid.startOfDay(new Date()).getTime();
+    }
   }
 
   //-----------------------------------------------------------------------------
@@ -319,11 +323,15 @@ class CalendarCardPro extends LitElement {
   private _handleVisibilityChange = () => {
     if (document.visibilityState === 'visible') {
       const now = Date.now();
-      // Only refresh if it's been a while
       if (now - this._lastUpdateTime > Constants.TIMING.VISIBILITY_REFRESH_THRESHOLD) {
         Logger.debug('Visibility changed to visible, updating events');
         this.updateEvents();
       }
+      if (this.config?.view === 'time-grid' && this.config.time_grid_show_now_line) {
+        this._startNowLine();
+      }
+    } else if (document.visibilityState === 'hidden') {
+      this._stopNowLine();
     }
   };
 
@@ -498,12 +506,18 @@ class CalendarCardPro extends LitElement {
   }
 
   private _updateNowLinePosition(): void {
+    const now = new Date();
+    if (Grid.hasDayChanged(this._lastRenderDay, now)) {
+      this._lastRenderDay = Grid.startOfDay(now).getTime();
+      this.requestUpdate();
+      return;
+    }
+
     const lineEl = this.renderRoot.querySelector<HTMLElement>(
       '.ccp-grid-day-column.today .ccp-grid-now-line',
     );
     if (!lineEl) return;
 
-    const now = new Date();
     const minutes = now.getHours() * 60 + now.getMinutes();
     const top = Grid.computeNowLineTop(
       minutes,

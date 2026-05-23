@@ -14,6 +14,7 @@ import {
   daysBetween,
   formatHourLabel,
   getReferenceDate,
+  hasDayChanged,
   isPastEvent,
   layoutOverlaps,
   minutesFromMidnight,
@@ -680,5 +681,31 @@ describe('computeNowLineTop', () => {
 
   it('before gridStartMin: 05:30 returns null', () => {
     expect(computeNowLineTop(330, 360, 1320, 24, 30)).toBeNull();
+  });
+});
+
+describe('hasDayChanged', () => {
+  it('G-midnightRefresh: same day returns false', () => {
+    const lastRender = startOfDay(new Date(2026, 4, 13)).getTime();
+    const now = new Date(2026, 4, 13, 23, 59, 0);
+    expect(hasDayChanged(lastRender, now)).toBe(false);
+  });
+
+  it('G-midnightRefresh: midnight rollover returns true', () => {
+    const lastRender = startOfDay(new Date(2026, 4, 13)).getTime();
+    const now = new Date(2026, 4, 14, 0, 0, 30);
+    expect(hasDayChanged(lastRender, now)).toBe(true);
+  });
+
+  it('arbitrary later day returns true', () => {
+    const lastRender = startOfDay(new Date(2026, 4, 13)).getTime();
+    const now = new Date(2026, 4, 20, 12, 0, 0);
+    expect(hasDayChanged(lastRender, now)).toBe(true);
+  });
+
+  it('earlier day returns true (clock-rewind defensive)', () => {
+    const lastRender = startOfDay(new Date(2026, 4, 13)).getTime();
+    const now = new Date(2026, 4, 12, 23, 0, 0);
+    expect(hasDayChanged(lastRender, now)).toBe(true);
   });
 });

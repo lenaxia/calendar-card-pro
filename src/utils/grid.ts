@@ -539,6 +539,17 @@ export function computeNowLineTop(
   return ((minutesNow - gridStartMin) / intervalMin) * slotHeightPx;
 }
 
+/**
+ * Detect whether `now` falls on a different local-day than the cached
+ * `lastRenderDayMs` (a `startOfDay(...).getTime()` snapshot). Used by the
+ * host's now-line tick to trigger `requestUpdate()` when the local date
+ * has rolled over, so the "today" highlight migrates to the new day-column
+ * without waiting for the next user action.
+ */
+export function hasDayChanged(lastRenderDayMs: number, now: Date): boolean {
+  return startOfDay(now).getTime() !== lastRenderDayMs;
+}
+
 //-----------------------------------------------------------------------------
 // INTERNAL HELPERS
 //-----------------------------------------------------------------------------
