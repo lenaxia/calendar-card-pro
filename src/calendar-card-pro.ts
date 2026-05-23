@@ -30,6 +30,8 @@ import { customElement, property } from 'lit/decorators.js';
 import * as Config from './config/config';
 import * as Constants from './config/constants';
 import * as Types from './config/types';
+import { NowLineController } from './controllers/now-line-controller';
+import { ResponsiveColumnsController } from './controllers/responsive-columns-controller';
 import * as Localize from './translations/localize';
 import * as EventUtils from './utils/events';
 import * as Actions from './interaction/actions';
@@ -111,15 +113,8 @@ class CalendarCardPro extends LitElement {
   private _weatherSetupVersion = 0;
   private _weatherSetupPending = false;
 
-  private _resizeObserver?: ResizeObserver;
-  private _resizeRafId?: number;
-
-  private _nowLineIntervalId?: number;
-  private _lastRenderDay: number = (() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
-  })();
+  private readonly _responsiveColumns: ResponsiveColumnsController;
+  private readonly _nowLine: NowLineController;
 
   // Interaction state
   private _activePointerId: number | null = null;
@@ -176,6 +171,20 @@ class CalendarCardPro extends LitElement {
     super();
     this._instanceId = Helpers.generateInstanceId();
     Logger.initializeLogger(Constants.VERSION.CURRENT);
+
+    // Time-grid view lifecycle controllers; activate only in time-grid view.
+    this._responsiveColumns = new ResponsiveColumnsController(this);
+    this._nowLine = new NowLineController(this);
+  }
+
+  /** @internal — required by ResponsiveColumnsController */
+  onVisibleDaysChanged(): void {
+    this._clampViewOffset();
+  }
+
+  /** @internal — required by NowLineController */
+  get hostElement(): Element {
+    return this;
   }
 
   connectedCallback() {
@@ -194,13 +203,8 @@ class CalendarCardPro extends LitElement {
     // Set up visibility listener
     document.addEventListener('visibilitychange', this._handleVisibilityChange);
 
-    this._syncObserver();
-    if (this.config.view === 'time-grid') {
-      this._applyVisibleDays(this.offsetWidth);
-    }
-    if (this.config.view === 'time-grid' && this.config.time_grid_show_now_line) {
-      this._startNowLine();
-    }
+    // Time-grid controllers (_responsiveColumns, _nowLine) self-register via
+    // hostConnected — no explicit setup needed here.
   }
 
   disconnectedCallback() {
@@ -237,24 +241,7 @@ class CalendarCardPro extends LitElement {
     // Remove listeners
     document.removeEventListener('visibilitychange', this._handleVisibilityChange);
 
-    if (this._resizeObserver) {
-      this._resizeObserver.disconnect();
-      this._resizeObserver = undefined;
-    }
-    if (this._resizeRafId !== undefined) {
-      cancelAnimationFrame(this._resizeRafId);
-      this._resizeRafId = undefined;
-    }
-
-    this._stopNowLine();
-
     Logger.debug('Component disconnected');
-  }
-
-  firstUpdated() {
-    if (this.config.view === 'time-grid' && this.config.time_grid_show_now_line) {
-      this._updateNowLinePosition();
-    }
   }
 
   updated(changedProps: PropertyValues) {
@@ -284,36 +271,16 @@ class CalendarCardPro extends LitElement {
     }
 
     if (changedProps.has('config')) {
-      this._syncObserver();
-      if (this.config.view === 'time-grid') {
-        this._applyVisibleDays(this.offsetWidth);
-      }
+      // Controllers handle their own observer/interval state via hostUpdated;
+      // host only does cross-controller orchestration here.
       if (prevConfig?.view !== this.config.view) {
-        // When transitioning between views, reset navigation. Coming back to grid
-        // from list should not preserve a stale offset that may exceed the new
-        // _maxOffset (especially after the user changed time_grid_navigation_days
-        // while they were in list view).
         this.viewOffsetDays = 0;
       } else if (
         prevConfig &&
         prevConfig.time_grid_navigation_days !== this.config.time_grid_navigation_days
       ) {
-        // navigation_days shrank (or grew); re-clamp so offset stays inside [0, max].
         this._clampViewOffset();
       }
-      if (
-        prevConfig?.view !== this.config.view ||
-        prevConfig?.time_grid_show_now_line !== this.config.time_grid_show_now_line
-      ) {
-        this._stopNowLine();
-        if (this.config.view === 'time-grid' && this.config.time_grid_show_now_line) {
-          this._startNowLine();
-        }
-      }
-    }
-
-    if (this.config?.view === 'time-grid') {
-      this._lastRenderDay = Grid.startOfDay(new Date()).getTime();
     }
   }
 
@@ -331,7 +298,10 @@ class CalendarCardPro extends LitElement {
   }
 
   /**
-   * Handle visibility changes to refresh data when returning to the page
+   * Handle visibility changes to refresh data when returning to the page.
+   * The NowLine controller has its own visibilitychange listener for tick
+   * pause/resume; the host listener handles the data-refresh and the
+   * "remeasure columns after a long hide" cases.
    */
   private _handleVisibilityChange = () => {
     if (document.visibilityState === 'visible') {
@@ -340,11 +310,10 @@ class CalendarCardPro extends LitElement {
         Logger.debug('Visibility changed to visible, updating events');
         this.updateEvents();
       }
-      if (this.config?.view === 'time-grid' && this.config.time_grid_show_now_line) {
-        this._startNowLine();
-      }
-    } else if (document.visibilityState === 'hidden') {
-      this._stopNowLine();
+      // The host may have been resized while hidden; ResizeObserver may not
+      // fire on hidden→visible if the dimensions did not actually change.
+      // Force a measurement pass so visibleDays reflects current width.
+      this._responsiveColumns.remeasure();
     }
   };
 
@@ -453,39 +422,6 @@ class CalendarCardPro extends LitElement {
     this._weatherUnsubscribers = [];
   }
 
-  private _syncObserver(): void {
-    const wantObserver = this.config.view === 'time-grid' && this.isConnected;
-    if (wantObserver && !this._resizeObserver) {
-      // Arrow function preserves `this` when ResizeObserver invokes the callback.
-      this._resizeObserver = new ResizeObserver(() => this._onResize());
-      this._resizeObserver.observe(this);
-    } else if (!wantObserver && this._resizeObserver) {
-      this._resizeObserver.disconnect();
-      this._resizeObserver = undefined;
-    }
-  }
-
-  private _onResize(): void {
-    if (this._resizeRafId !== undefined) return;
-    this._resizeRafId = requestAnimationFrame(() => {
-      this._resizeRafId = undefined;
-      this._applyVisibleDays(this.offsetWidth);
-    });
-  }
-
-  private _applyVisibleDays(widthPx: number): void {
-    const next = Grid.chooseVisibleDays(
-      widthPx,
-      this.config.time_grid_breakpoint_three_day_px,
-      this.config.time_grid_breakpoint_seven_day_px,
-      this.config.time_grid_max_days,
-    );
-    if (next !== this.visibleDays) {
-      this.visibleDays = next;
-      this._clampViewOffset();
-    }
-  }
-
   private _maxOffset(): number {
     return Math.max(0, this.config.time_grid_navigation_days - this.visibleDays);
   }
@@ -513,49 +449,6 @@ class CalendarCardPro extends LitElement {
       this.visibleDays,
       this.config.time_grid_navigation_days,
     );
-  }
-
-  private _startNowLine(): void {
-    if (this._nowLineIntervalId !== undefined) return;
-    this._updateNowLinePosition();
-    this._nowLineIntervalId = window.setInterval(() => this._updateNowLinePosition(), 60_000);
-  }
-
-  private _stopNowLine(): void {
-    if (this._nowLineIntervalId !== undefined) {
-      clearInterval(this._nowLineIntervalId);
-      this._nowLineIntervalId = undefined;
-    }
-  }
-
-  private _updateNowLinePosition(): void {
-    const now = new Date();
-    if (Grid.hasDayChanged(this._lastRenderDay, now)) {
-      this._lastRenderDay = Grid.startOfDay(now).getTime();
-      this.requestUpdate();
-      return;
-    }
-
-    const lineEl = this.renderRoot.querySelector<HTMLElement>(
-      '.ccp-grid-day-column.today .ccp-grid-now-line',
-    );
-    if (!lineEl) return;
-
-    const minutes = now.getHours() * 60 + now.getMinutes();
-    const top = Grid.computeNowLineTop(
-      minutes,
-      this.config.time_grid_start_hour * 60,
-      this.config.time_grid_end_hour * 60,
-      Grid.SLOT_HEIGHT_PX,
-      this.config.time_grid_interval_minutes,
-    );
-
-    if (top === null) {
-      lineEl.style.display = 'none';
-      return;
-    }
-    lineEl.style.display = '';
-    lineEl.style.top = `${top}px`;
   }
 
   /**
@@ -819,7 +712,7 @@ class CalendarCardPro extends LitElement {
         {
           visibleDays: this.visibleDays,
           offsetDays: this.viewOffsetDays,
-          now: new Date(),
+          now: this._nowLine.now,
           onShiftDay: (d) => this._shiftDays(d),
           onShiftWindow: (d) => this._shiftDays(d * this.visibleDays),
           onResetToToday: () => {

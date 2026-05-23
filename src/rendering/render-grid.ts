@@ -112,6 +112,22 @@ export function renderTimeGrid(
 
   const todayIdx = computeTodayIdx(windowStart, ctx.now, ctx.visibleDays);
 
+  // Now-line top position. Computed once per render. When today is not in the
+  // visible window, todayIdx is -1 and the line is not emitted at all. When
+  // today is visible but `now` is outside the band, computeNowLineTop returns
+  // null and we suppress the line for this render.
+  const nowMinutes = ctx.now.getHours() * 60 + ctx.now.getMinutes();
+  const nowLineTopPx =
+    todayIdx >= 0 && config.time_grid_show_now_line
+      ? Grid.computeNowLineTop(
+          nowMinutes,
+          gridStartMin,
+          gridEndMin,
+          Grid.SLOT_HEIGHT_PX,
+          config.time_grid_interval_minutes,
+        )
+      : null;
+
   const eventsByDay = bucketAndPlaceEvents(events, days, ctx, config, {
     windowStart,
     windowEnd,
@@ -228,8 +244,11 @@ export function renderTimeGrid(
           ${days.map(
             (_day, i) => html`
               <div class="ccp-grid-day-column ${classMap({ today: i === todayIdx })}">
-                ${i === todayIdx && config.time_grid_show_now_line
-                  ? html`<div class="ccp-grid-now-line"></div>`
+                ${i === todayIdx && nowLineTopPx !== null
+                  ? html`<div
+                      class="ccp-grid-now-line"
+                      style=${styleMap({ top: `${nowLineTopPx}px` })}
+                    ></div>`
                   : nothing}
                 ${eventsByDay[i].map((seg) => renderEventBlock(seg, config, use24h, ctx.now))}
               </div>
