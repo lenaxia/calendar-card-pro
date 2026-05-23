@@ -27,6 +27,7 @@ import {
   mdiCardText, // For Event Display
   mdiGestureTapHold, // For Interactions
   mdiPalette, // For Appearance & Layout
+  mdiViewWeek, // For Time Grid
   mdiWeatherPartlyCloudy, // For Weather Integration
 } from '@mdi/js';
 
@@ -584,6 +585,23 @@ export class CalendarCardProEditor extends LitElement {
     }
   }
 
+  /**
+   * Renders a warning hint when `time_grid_navigation_days` is smaller than
+   * `time_grid_max_days`, because that combination prevents the user from ever
+   * seeing the full configured grid width (FR-7.6).
+   * @returns Lit template for the hint, or `nothing` if values are consistent
+   */
+  private _renderNavigationDaysHint(): TemplateResult | typeof nothing {
+    const navDays = this.getConfigValue('time_grid_navigation_days') as number;
+    const maxDays = this.getConfigValue('time_grid_max_days') as number;
+    if (typeof navDays === 'number' && typeof maxDays === 'number' && navDays < maxDays) {
+      return html`
+        <div class="helper-text">${this._getTranslation('time_grid_navigation_days_warning')}</div>
+      `;
+    }
+    return nothing;
+  }
+
   //-----------------------------------------------------------------------------
   // MAIN RENDER METHOD
   //-----------------------------------------------------------------------------
@@ -645,8 +663,20 @@ export class CalendarCardProEditor extends LitElement {
             <!-- Display Range -->
             <h3>${this._getTranslation('time_range')}</h3>
             <div class="helper-text">${this._getTranslation('time_range_note')}</div>
-            ${this.addTextField('days_to_show', this._getTranslation('days_to_show'), 'number')}
-            <div class="helper-text">${this._getTranslation('days_to_show_note')}</div>
+            ${this.addSelectField('view', this._getTranslation('view'), [
+              { value: 'list', label: this._getTranslation('view_list') },
+              { value: 'time-grid', label: this._getTranslation('view_time_grid') },
+            ])}
+            ${this.getConfigValue('view') !== 'time-grid'
+              ? html`
+                  ${this.addTextField(
+                    'days_to_show',
+                    this._getTranslation('days_to_show'),
+                    'number',
+                  )}
+                  <div class="helper-text">${this._getTranslation('days_to_show_note')}</div>
+                `
+              : nothing}
             ${this.addSelectField(
               'start_date_mode',
               this._getTranslation('start_date_mode'),
@@ -685,30 +715,39 @@ export class CalendarCardProEditor extends LitElement {
             })()}
 
             <!-- Compact Mode -->
-            <h3>${this._getTranslation('compact_mode')}</h3>
-            <div class="helper-text">${this._getTranslation('compact_mode_note')}</div>
-            ${this.addTextField(
-              'compact_days_to_show',
-              this._getTranslation('compact_days_to_show'),
-              'number',
-            )}
-            ${this.addTextField(
-              'compact_events_to_show',
-              this._getTranslation('compact_events_to_show'),
-              'number',
-            )}
-            ${this.addBooleanField(
-              'compact_events_complete_days',
-              this._getTranslation('compact_events_complete_days'),
-            )}
-            <div class="helper-text">
-              ${this._getTranslation('compact_events_complete_days_note')}
-            </div>
+            ${this.getConfigValue('view') !== 'time-grid'
+              ? html`
+                  <h3>${this._getTranslation('compact_mode')}</h3>
+                  <div class="helper-text">${this._getTranslation('compact_mode_note')}</div>
+                  ${this.addTextField(
+                    'compact_days_to_show',
+                    this._getTranslation('compact_days_to_show'),
+                    'number',
+                  )}
+                  ${this.addTextField(
+                    'compact_events_to_show',
+                    this._getTranslation('compact_events_to_show'),
+                    'number',
+                  )}
+                  ${this.addBooleanField(
+                    'compact_events_complete_days',
+                    this._getTranslation('compact_events_complete_days'),
+                  )}
+                  <div class="helper-text">
+                    ${this._getTranslation('compact_events_complete_days_note')}
+                  </div>
+                `
+              : nothing}
 
             <!-- Event Visibility -->
             <h3>${this._getTranslation('event_visibility')}</h3>
             ${this.addBooleanField('show_past_events', this._getTranslation('show_past_events'))}
-            ${this.addBooleanField('show_empty_days', this._getTranslation('show_empty_days'))}
+            ${this.getConfigValue('view') !== 'time-grid'
+              ? html`${this.addBooleanField(
+                  'show_empty_days',
+                  this._getTranslation('show_empty_days'),
+                )}`
+              : nothing}
             ${this.addBooleanField('filter_duplicates', this._getTranslation('filter_duplicates'))}
 
             <!-- Language & Time Formats -->
@@ -738,6 +777,71 @@ export class CalendarCardProEditor extends LitElement {
             ])}
           `,
         )}
+
+        <!-- TIME GRID -->
+        ${this.getConfigValue('view') === 'time-grid'
+          ? this.addExpansionPanel(
+              this._getTranslation('time_grid_settings'),
+              mdiViewWeek,
+              html`
+                ${this.addTextField(
+                  'time_grid_start_hour',
+                  this._getTranslation('time_grid_start_hour'),
+                  'number',
+                )}
+                ${this.addTextField(
+                  'time_grid_end_hour',
+                  this._getTranslation('time_grid_end_hour'),
+                  'number',
+                )}
+                ${this.addTextField(
+                  'time_grid_interval_minutes',
+                  this._getTranslation('time_grid_interval_minutes'),
+                  'number',
+                )}
+                <div class="helper-text">
+                  ${this._getTranslation('time_grid_interval_minutes_note')}
+                </div>
+                ${this.addTextField(
+                  'time_grid_event_min_height_px',
+                  this._getTranslation('time_grid_event_min_height_px'),
+                  'number',
+                )}
+                ${this.addTextField(
+                  'time_grid_max_days',
+                  this._getTranslation('time_grid_max_days'),
+                  'number',
+                )}
+                <div class="helper-text">${this._getTranslation('time_grid_max_days_note')}</div>
+                ${this.addTextField(
+                  'time_grid_navigation_days',
+                  this._getTranslation('time_grid_navigation_days'),
+                  'number',
+                )}
+                ${this._renderNavigationDaysHint()}
+                ${this.addTextField(
+                  'time_grid_breakpoint_three_day_px',
+                  this._getTranslation('time_grid_breakpoint_three_day_px'),
+                  'number',
+                )}
+                ${this.addTextField(
+                  'time_grid_breakpoint_seven_day_px',
+                  this._getTranslation('time_grid_breakpoint_seven_day_px'),
+                  'number',
+                )}
+                ${this.addBooleanField(
+                  'time_grid_show_now_line',
+                  this._getTranslation('time_grid_show_now_line'),
+                )}
+                ${this.addTextField(
+                  'time_grid_allday_bg_opacity',
+                  this._getTranslation('time_grid_allday_bg_opacity'),
+                  'number',
+                )}
+              `,
+              false,
+            )
+          : nothing}
 
         <!-- APPEARANCE & LAYOUT -->
         ${this.addExpansionPanel(
