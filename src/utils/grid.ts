@@ -50,6 +50,18 @@ export type LayoutResult<T extends OverlapInput> = T & {
   laneCount: number;
 };
 
+/**
+ * A single timed segment (already split by day boundary) ready to be placed
+ * into a column bucket. Carried by `bucketAndPlaceSegments` so the renderer
+ * can flow it through `layoutOverlaps` without re-deriving start/end minutes.
+ */
+export interface PlacedSegment {
+  event: Types.CalendarEventData;
+  startMin: number;
+  endMin: number;
+  placement: EventPlacement;
+}
+
 //-----------------------------------------------------------------------------
 // DATE / TIME HELPERS
 //-----------------------------------------------------------------------------
@@ -234,6 +246,82 @@ export function computeEventPlacement(
   const heightPx = Math.min(maxHeight, Math.max(rawHeight, minHeightPx));
 
   return { topPx, heightPx, clippedTop, clippedBottom, outsideRange: false };
+}
+
+/**
+ * Parameters shared by every column when bucketing pre-split segments.
+ */
+export interface BucketParams {
+  gridStartMin: number;
+  gridEndMin: number;
+  slotHeightPx: number;
+  intervalMin: number;
+  minHeightPx: number;
+}
+
+/**
+ * Distributes already-day-split timed segments into per-column buckets and
+ * counts segments whose placement falls entirely outside the visible hour
+ * band. The visible buckets feed `layoutOverlaps`; the per-column hidden
+ * counts drive the FR-2.6 "+N hidden" pill rendered at the top of each
+ * day-column.
+ *
+ * Counts are per-column-index, never global — a hidden segment is attributed
+ * to the column it would have rendered into. Segments lacking a `dateTime`
+ * boundary or whose start falls outside `[days[i], days[i] + 1d)` for every
+ * `i` are silently ignored (they cannot be attributed to any visible column).
+ *
+ * @param segments - pre-split timed segments (one event may have already been
+ *                   split into per-day pieces by `splitTimedEventByDay`)
+ * @param days - local-midnight Dates of the visible columns
+ * @param params - placement parameters (band edges, slot/interval, min height)
+ * @returns visible buckets ready for `layoutOverlaps` + per-column hidden counts
+ */
+export function bucketAndPlaceSegments(
+  segments: ReadonlyArray<Types.CalendarEventData>,
+  days: ReadonlyArray<Date>,
+  params: BucketParams,
+): { buckets: PlacedSegment[][]; hiddenCounts: number[] } {
+  const buckets: PlacedSegment[][] = days.map(() => []);
+  const hiddenCounts: number[] = days.map(() => 0);
+
+  for (let i = 0; i < days.length; i++) {
+    const dayStart = days[i];
+    const nextDay = new Date(dayStart);
+    nextDay.setDate(nextDay.getDate() + 1);
+
+    for (const seg of segments) {
+      if (!seg.start.dateTime || !seg.end.dateTime) continue;
+      const segStart = new Date(seg.start.dateTime);
+      if (segStart < dayStart || segStart >= nextDay) continue;
+
+      const segEnd = new Date(seg.end.dateTime);
+      const startMin = minutesFromMidnight(segStart);
+      // An event ending exactly at the next local midnight should occupy the
+      // full-day band (1440), not wrap to 0 — the latter would make the
+      // segment look zero-length to computeEventPlacement.
+      const endMin = segEnd.getTime() >= nextDay.getTime() ? 24 * 60 : minutesFromMidnight(segEnd);
+
+      const placement = computeEventPlacement(
+        startMin,
+        endMin,
+        params.gridStartMin,
+        params.gridEndMin,
+        params.slotHeightPx,
+        params.intervalMin,
+        params.minHeightPx,
+      );
+
+      if (placement.outsideRange) {
+        hiddenCounts[i]++;
+        continue;
+      }
+
+      buckets[i].push({ event: seg, startMin, endMin, placement });
+    }
+  }
+
+  return { buckets, hiddenCounts };
 }
 
 //-----------------------------------------------------------------------------

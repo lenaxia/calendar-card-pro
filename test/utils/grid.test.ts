@@ -5,6 +5,7 @@ import * as Types from '../../src/config/types';
 import {
   GRID_FETCH_BACK_HEADROOM_DAYS,
   SLOT_HEIGHT_PX,
+  bucketAndPlaceSegments,
   buildDayWindow,
   buildGridFetchConfig,
   chooseVisibleDays,
@@ -358,6 +359,89 @@ describe('splitTimedEventByDay', () => {
     expect(segs).toHaveLength(1);
     expect(segs[0].start.dateTime).toBe(isoLocal(2026, 5, 13, 9, 0));
     expect(segs[0].end.dateTime).toBe(isoLocal(2026, 5, 13, 11, 0));
+  });
+});
+
+describe('bucketAndPlaceSegments', () => {
+  // Three-day window, 06:00-22:00 band (the FR-2.6 design's reference example).
+  const days = [new Date(2026, 4, 13), new Date(2026, 4, 14), new Date(2026, 4, 15)];
+  const params = {
+    gridStartMin: 360,
+    gridEndMin: 1320,
+    slotHeightPx: 24,
+    intervalMin: 30,
+    minHeightPx: 24,
+  };
+
+  it('FR-2.6: counts a fully-out-of-band segment as hidden, not visible', () => {
+    const seg = timed(isoLocal(2026, 5, 14, 2, 0), isoLocal(2026, 5, 14, 4, 0));
+    const r = bucketAndPlaceSegments([seg], days, params);
+    expect(r.hiddenCounts).toEqual([0, 1, 0]);
+    expect(r.buckets[1]).toHaveLength(0);
+    expect(r.buckets[0]).toHaveLength(0);
+    expect(r.buckets[2]).toHaveLength(0);
+  });
+
+  it('FR-2.6: hidden counts are per-column, never global', () => {
+    // Two hidden segments on day 0, one hidden on day 2, none on day 1.
+    const segs = [
+      timed(isoLocal(2026, 5, 13, 1, 0), isoLocal(2026, 5, 13, 2, 0)),
+      timed(isoLocal(2026, 5, 13, 22, 30), isoLocal(2026, 5, 13, 23, 30)),
+      timed(isoLocal(2026, 5, 15, 23, 0), isoLocal(2026, 5, 15, 23, 45)),
+    ];
+    const r = bucketAndPlaceSegments(segs, days, params);
+    expect(r.hiddenCounts).toEqual([2, 0, 1]);
+    r.buckets.forEach((b) => expect(b).toHaveLength(0));
+  });
+
+  it('FR-2.6: places in-band segments and leaves hiddenCounts at 0', () => {
+    const segs = [
+      timed(isoLocal(2026, 5, 13, 9, 0), isoLocal(2026, 5, 13, 10, 0)),
+      timed(isoLocal(2026, 5, 14, 14, 30), isoLocal(2026, 5, 14, 15, 30)),
+    ];
+    const r = bucketAndPlaceSegments(segs, days, params);
+    expect(r.hiddenCounts).toEqual([0, 0, 0]);
+    expect(r.buckets[0]).toHaveLength(1);
+    expect(r.buckets[1]).toHaveLength(1);
+    expect(r.buckets[2]).toHaveLength(0);
+    expect(r.buckets[0][0].placement.outsideRange).toBe(false);
+    expect(r.buckets[0][0].startMin).toBe(540);
+    expect(r.buckets[0][0].endMin).toBe(600);
+  });
+
+  it('FR-2.6: clipped events placed visibly, not counted as hidden', () => {
+    // 05:00-07:00 crosses the band's top (06:00) — clippedTop=true but visible.
+    const seg = timed(isoLocal(2026, 5, 13, 5, 0), isoLocal(2026, 5, 13, 7, 0));
+    const r = bucketAndPlaceSegments([seg], days, params);
+    expect(r.hiddenCounts).toEqual([0, 0, 0]);
+    expect(r.buckets[0]).toHaveLength(1);
+    expect(r.buckets[0][0].placement.clippedTop).toBe(true);
+    expect(r.buckets[0][0].placement.outsideRange).toBe(false);
+  });
+
+  it('FR-2.6: segment starting outside every visible day is silently dropped', () => {
+    const seg = timed(isoLocal(2026, 5, 20, 9, 0), isoLocal(2026, 5, 20, 10, 0));
+    const r = bucketAndPlaceSegments([seg], days, params);
+    expect(r.hiddenCounts).toEqual([0, 0, 0]);
+    r.buckets.forEach((b) => expect(b).toHaveLength(0));
+  });
+
+  it('returns one bucket and one hidden-count per day, even with no segments', () => {
+    const r = bucketAndPlaceSegments([], days, params);
+    expect(r.buckets).toHaveLength(3);
+    expect(r.hiddenCounts).toHaveLength(3);
+    r.buckets.forEach((b) => expect(b).toHaveLength(0));
+    r.hiddenCounts.forEach((c) => expect(c).toBe(0));
+  });
+
+  it('handles a segment ending exactly at next-day midnight without zero-length placement', () => {
+    const seg = timed(isoLocal(2026, 5, 13, 21, 0), isoLocal(2026, 5, 14, 0, 0));
+    const r = bucketAndPlaceSegments([seg], days, params);
+    expect(r.hiddenCounts).toEqual([0, 0, 0]);
+    expect(r.buckets[0]).toHaveLength(1);
+    expect(r.buckets[0][0].endMin).toBe(1440);
+    // Placement clamps height to band; top is at 21:00 = 15h after band start = 360 - 360
+    expect(r.buckets[0][0].placement.clippedBottom).toBe(true);
   });
 });
 

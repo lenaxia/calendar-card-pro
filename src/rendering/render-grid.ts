@@ -40,14 +40,12 @@ export interface TimeGridContext {
 // INTERNAL TYPES
 //-----------------------------------------------------------------------------
 
-interface PlacedSegment {
-  event: Types.CalendarEventData;
-  startMin: number;
-  endMin: number;
-  placement: Grid.EventPlacement;
-}
+type LaidOutSegment = Grid.LayoutResult<Grid.PlacedSegment>;
 
-type LaidOutSegment = Grid.LayoutResult<PlacedSegment>;
+interface BucketedDays {
+  visible: LaidOutSegment[][];
+  hiddenCounts: number[];
+}
 
 interface AllDayBanner {
   event: Types.CalendarEventData;
@@ -154,6 +152,9 @@ export function renderTimeGrid(
   const nextWindowLabel = String(
     Localize.translate(language, 'time_grid_next_window_aria', `Next ${ctx.visibleDays} days`),
   ).replace('{n}', String(ctx.visibleDays));
+  const hiddenAriaTemplate = String(
+    Localize.translate(language, 'time_grid_hidden_events_aria', '{n} hidden events'),
+  );
 
   const navClick = (handler: () => void) => (e: Event) => {
     e.stopPropagation();
@@ -244,13 +245,26 @@ export function renderTimeGrid(
           ${days.map(
             (_day, i) => html`
               <div class="ccp-grid-day-column ${classMap({ today: i === todayIdx })}">
+                ${eventsByDay.hiddenCounts[i] > 0
+                  ? html`<div
+                      class="ccp-grid-hidden-pill"
+                      aria-label=${hiddenAriaTemplate.replace(
+                        '{n}',
+                        String(eventsByDay.hiddenCounts[i]),
+                      )}
+                    >
+                      +${eventsByDay.hiddenCounts[i]}
+                    </div>`
+                  : nothing}
                 ${i === todayIdx && nowLineTopPx !== null
                   ? html`<div
                       class="ccp-grid-now-line"
                       style=${styleMap({ top: `${nowLineTopPx}px` })}
                     ></div>`
                   : nothing}
-                ${eventsByDay[i].map((seg) => renderEventBlock(seg, config, use24h, ctx.now))}
+                ${eventsByDay.visible[i].map((seg) =>
+                  renderEventBlock(seg, config, use24h, ctx.now),
+                )}
               </div>
             `,
           )}
@@ -280,7 +294,7 @@ function bucketAndPlaceEvents(
   ctx: TimeGridContext,
   config: Types.Config,
   params: PlacementParams,
-): LaidOutSegment[][] {
+): BucketedDays {
   const visible = filterToWindow(events, params.windowStart, params.windowEnd);
   const timed = visible.filter((e) => !!e.start.dateTime);
   const filtered = config.show_past_events
@@ -292,41 +306,16 @@ function bucketAndPlaceEvents(
     segments.push(...Grid.splitTimedEventByDay(event, params.windowStart, params.windowEnd));
   }
 
-  const buckets: LaidOutSegment[][] = days.map(() => []);
-  for (let i = 0; i < days.length; i++) {
-    const dayStart = days[i];
-    const nextDay = addDays(dayStart, 1);
-    const placed: PlacedSegment[] = [];
+  const { buckets, hiddenCounts } = Grid.bucketAndPlaceSegments(segments, days, {
+    gridStartMin: params.gridStartMin,
+    gridEndMin: params.gridEndMin,
+    slotHeightPx: params.slotHeightPx,
+    intervalMin: params.intervalMin,
+    minHeightPx: params.minHeightPx,
+  });
 
-    for (const seg of segments) {
-      if (!seg.start.dateTime) continue;
-      const segStart = new Date(seg.start.dateTime);
-      if (segStart < dayStart || segStart >= nextDay) continue;
-
-      const segEnd = seg.end.dateTime ? new Date(seg.end.dateTime) : null;
-      if (!segEnd) continue;
-
-      const startMin = Grid.minutesFromMidnight(segStart);
-      const endMinRaw =
-        segEnd.getTime() >= nextDay.getTime() ? 24 * 60 : Grid.minutesFromMidnight(segEnd);
-      const placement = Grid.computeEventPlacement(
-        startMin,
-        endMinRaw,
-        params.gridStartMin,
-        params.gridEndMin,
-        params.slotHeightPx,
-        params.intervalMin,
-        params.minHeightPx,
-      );
-      if (placement.outsideRange) continue;
-
-      placed.push({ event: seg, startMin, endMin: endMinRaw, placement });
-    }
-
-    buckets[i] = Grid.layoutOverlaps(placed);
-  }
-
-  return buckets;
+  const laidOut: LaidOutSegment[][] = buckets.map((bucket) => Grid.layoutOverlaps(bucket));
+  return { visible: laidOut, hiddenCounts };
 }
 
 function filterToWindow(

@@ -16,6 +16,7 @@
   "time_grid_next_day_aria": "Next day",
   "time_grid_prev_window_aria": "Previous {n} days",
   "time_grid_next_window_aria": "Next {n} days",
+  "time_grid_hidden_events_aria": "{n} hidden events",
 
   "editor": {
     "calendar_entities": "Calendar Entities",
@@ -230,7 +231,7 @@
     "show_temp": "Show temperature",
     "show_uv_index": "Show UV index",
     "uv_index_threshold": "UV index threshold",
-    
+
     "interactions": "Interactions",
     "tap_action": "Tap Action",
     "hold_action": "Hold Action",

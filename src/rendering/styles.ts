@@ -846,6 +846,34 @@ export const cardStyles = css`
     opacity: 0.55;
   }
 
+  /*
+   * FR-2.6 clip indicators. Pseudo-elements are decorative — screen readers
+   * skip CSS-generated content by default, and the event title + time still
+   * convey the full information for AT. The event block itself uses
+   * position:absolute so these absolute pseudo-children anchor to its box.
+   */
+  .ccp-grid-event.clipped-top::before {
+    content: '↑';
+    position: absolute;
+    top: 0;
+    inset-inline-start: 2px;
+    font-size: 10px;
+    line-height: 1;
+    opacity: 0.7;
+    pointer-events: none;
+  }
+
+  .ccp-grid-event.clipped-bottom::after {
+    content: '↓';
+    position: absolute;
+    bottom: 0;
+    inset-inline-start: 2px;
+    font-size: 10px;
+    line-height: 1;
+    opacity: 0.7;
+    pointer-events: none;
+  }
+
   .ccp-grid-event-title {
     font-weight: 500;
     white-space: nowrap;
