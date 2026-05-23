@@ -731,7 +731,7 @@ export const cardStyles = css`
     outline-offset: 1px;
   }
 
-  .ccp-grid-nav button[aria-disabled='true'],
+  .ccp-grid-nav button[disabled],
   .ccp-grid-nav button:disabled {
     opacity: 0.4;
     cursor: not-allowed;

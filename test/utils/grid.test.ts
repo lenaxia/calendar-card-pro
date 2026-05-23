@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_CONFIG } from '../../src/config/config';
 import * as Types from '../../src/config/types';
+import { formatRangeLabel } from '../../src/rendering/render-grid';
 import {
   GRID_FETCH_BACK_HEADROOM_DAYS,
   SLOT_HEIGHT_PX,
@@ -28,6 +29,7 @@ import {
   startOfDay,
   startOfWeek,
 } from '../../src/utils/grid';
+import { convertToRGBA } from '../../src/utils/helpers';
 
 const isoLocal = (y: number, m: number, d: number, hh = 0, mm = 0): string => {
   const pad = (n: number): string => String(n).padStart(2, '0');
@@ -644,12 +646,20 @@ describe('isPastEvent', () => {
 });
 
 describe('formatHourLabel', () => {
-  it('G-hourLabel: formatHourLabel(0, true) === "0"', () => {
-    expect(formatHourLabel(0, true)).toBe('0');
+  it('G-hourLabel: formatHourLabel(0, true) === "00" (E-2: zero-padded for visual alignment)', () => {
+    expect(formatHourLabel(0, true)).toBe('00');
+  });
+
+  it('G-hourLabel: formatHourLabel(9, true) === "09" (E-2: zero-padded)', () => {
+    expect(formatHourLabel(9, true)).toBe('09');
   });
 
   it('G-hourLabel: formatHourLabel(13, true) === "13"', () => {
     expect(formatHourLabel(13, true)).toBe('13');
+  });
+
+  it('G-hourLabel: formatHourLabel(23, true) === "23"', () => {
+    expect(formatHourLabel(23, true)).toBe('23');
   });
 
   it('G-hourLabel: formatHourLabel(0, false) === "12 AM"', () => {
@@ -801,33 +811,129 @@ describe('clampOffset', () => {
 });
 
 describe('computeTodayOffset', () => {
-  it('G-Today: start_date="-7" puts today at offset 7', () => {
+  // 7-day mode (with week-snap): contract is "today must be in snapped window"
+  it('G-Today: 7-day Mon-week, start_date="-7" — picks the week containing today', () => {
+    // May 6 Wed, today May 13 Wed; week-of-today (Mon-anchored) starts May 11.
+    // daysBetween(May 6, May 11) = 5.
     const reference = new Date(2026, 4, 6);
     const today = new Date(2026, 4, 13);
-    expect(computeTodayOffset(reference, today, 7, 28)).toBe(7);
+    expect(computeTodayOffset(reference, today, 7, 28, 1)).toBe(5);
   });
 
-  it('reference === today returns 0 (default config)', () => {
+  it('G-Today: 7-day Sun-week, start_date="-7" — picks the week containing today', () => {
+    // May 6 Wed, today May 13 Wed; week-of-today (Sun-anchored) starts May 10.
+    // daysBetween(May 6, May 10) = 4.
+    const reference = new Date(2026, 4, 6);
     const today = new Date(2026, 4, 13);
-    expect(computeTodayOffset(today, today, 7, 28)).toBe(0);
+    expect(computeTodayOffset(reference, today, 7, 28, 0)).toBe(4);
+  });
+
+  it('reference === today on Monday returns 0 (week-start === today === ref)', () => {
+    const today = new Date(2026, 4, 11);
+    expect(computeTodayOffset(today, today, 7, 28, 1)).toBe(0);
+  });
+
+  it('reference === today mid-week clamps to 0 (week-start is before ref)', () => {
+    // May 13 Wed. With fdow=Mon, weekStart=May 11. daysBetween(May 13, May 11) = -2 → 0.
+    const today = new Date(2026, 4, 13);
+    expect(computeTodayOffset(today, today, 7, 28, 1)).toBe(0);
   });
 
   it('future start_date: today before reference clamps to 0', () => {
     const reference = new Date(2026, 4, 18);
     const today = new Date(2026, 4, 13);
-    expect(computeTodayOffset(reference, today, 7, 28)).toBe(0);
+    expect(computeTodayOffset(reference, today, 7, 28, 1)).toBe(0);
   });
 
-  it('clamps at maxOffset when navigationDays is small', () => {
+  it('E-1 fix: when navDays is too small to reach today via _maxOffset, overshoots so snap still includes today', () => {
+    // ref=May 1 Fri, today=May 30 Sat, vis=7, navDays=14. fdow=Mon → weekStart=May 25.
+    // daysBetween(May 1, May 25) = 24. Old (clamping) returned max=14-7=7,
+    // which after snap gave window May 4..10 — today NOT in window.
     const reference = new Date(2026, 4, 1);
     const today = new Date(2026, 4, 30);
-    expect(computeTodayOffset(reference, today, 7, 14)).toBe(7);
+    expect(computeTodayOffset(reference, today, 7, 14, 1)).toBe(24);
   });
 
+  it('E-1 reproducer: ref=today-7, navDays=10 — overshoots _maxOffset to keep today in window', () => {
+    // The original failure case from the task spec.
+    // ref=Wed May 6, today=Wed May 13, vis=7, navDays=10, fdow=Mon → weekStart=May 11.
+    // _maxOffset = 10 - 7 = 3 (clamp would lose today). Returns 5 instead.
+    const reference = new Date(2026, 4, 6);
+    const today = new Date(2026, 4, 13);
+    expect(computeTodayOffset(reference, today, 7, 10, 1)).toBe(5);
+  });
+
+  // 1- and 3-day modes (no snap): clamping behavior unchanged
   it('respects visibleDays (1-day mode caps at navigationDays - 1)', () => {
     const reference = new Date(2026, 4, 1);
     const today = new Date(2026, 4, 30);
-    expect(computeTodayOffset(reference, today, 1, 14)).toBe(13);
+    expect(computeTodayOffset(reference, today, 1, 14, 1)).toBe(13);
+  });
+
+  it('3-day mode clamps to maxOffset when today is past nav range', () => {
+    const reference = new Date(2026, 4, 1);
+    const today = new Date(2026, 4, 30);
+    expect(computeTodayOffset(reference, today, 3, 14, 1)).toBe(11);
+  });
+
+  it('3-day mode places today at left edge when within nav range', () => {
+    const reference = new Date(2026, 4, 1);
+    const today = new Date(2026, 4, 6);
+    expect(computeTodayOffset(reference, today, 3, 14, 1)).toBe(5);
+  });
+});
+
+describe('computeTodayOffset → snapToWindow integration (Phase H-3)', () => {
+  const containsDate = (days: Date[], target: Date): boolean =>
+    days.some((d) => d.getTime() === target.getTime());
+
+  it('H-3a: 7-day Mon-week, ref=today-7, navDays=10 — today is in snapped window', () => {
+    const reference = new Date(2026, 4, 6);
+    const today = new Date(2026, 4, 13);
+    const offset = computeTodayOffset(reference, today, 7, 10, 1);
+    const { days } = snapToWindow(reference, offset, 7, 1);
+    expect(containsDate(days, today)).toBe(true);
+  });
+
+  it('H-3b: 7-day Mon-week, navDays=14 (E-1 case) — today is in snapped window', () => {
+    const reference = new Date(2026, 4, 1);
+    const today = new Date(2026, 4, 30);
+    const offset = computeTodayOffset(reference, today, 7, 14, 1);
+    const { days } = snapToWindow(reference, offset, 7, 1);
+    expect(containsDate(days, today)).toBe(true);
+  });
+
+  it('H-3c: 7-day Sun-week aligns to Sunday and includes today', () => {
+    const reference = new Date(2026, 4, 6);
+    const today = new Date(2026, 4, 13);
+    const offset = computeTodayOffset(reference, today, 7, 28, 0);
+    const { start, days } = snapToWindow(reference, offset, 7, 0);
+    expect(start.getDay()).toBe(0);
+    expect(containsDate(days, today)).toBe(true);
+  });
+
+  it('H-3d: 7-day mode, today on a Monday with fdow=Mon — included in snapped window', () => {
+    const reference = new Date(2026, 4, 11);
+    const today = new Date(2026, 4, 11);
+    const offset = computeTodayOffset(reference, today, 7, 28, 1);
+    const { days } = snapToWindow(reference, offset, 7, 1);
+    expect(containsDate(days, today)).toBe(true);
+  });
+
+  it('H-3e: 1-day mode — today is the only column and matches', () => {
+    const reference = new Date(2026, 4, 1);
+    const today = new Date(2026, 4, 5);
+    const offset = computeTodayOffset(reference, today, 1, 28, 1);
+    const { days } = snapToWindow(reference, offset, 1, 1);
+    expect(containsDate(days, today)).toBe(true);
+  });
+
+  it('H-3f: 3-day mode — today is in the window', () => {
+    const reference = new Date(2026, 4, 1);
+    const today = new Date(2026, 4, 5);
+    const offset = computeTodayOffset(reference, today, 3, 28, 1);
+    const { days } = snapToWindow(reference, offset, 3, 1);
+    expect(containsDate(days, today)).toBe(true);
   });
 });
 
@@ -940,5 +1046,66 @@ describe('hasDayChanged', () => {
     const lastRender = startOfDay(new Date(2026, 4, 13)).getTime();
     const now = new Date(2026, 4, 12, 23, 0, 0);
     expect(hasDayChanged(lastRender, now)).toBe(true);
+  });
+});
+
+//-----------------------------------------------------------------------------
+// E-12: convertToRGBA preserves user-provided CSS variable names
+//-----------------------------------------------------------------------------
+
+describe('convertToRGBA (E-12)', () => {
+  it('preserves user-provided var(--my-color) instead of substituting --calendar-color-rgb', () => {
+    const result = convertToRGBA('var(--my-accent)', 50);
+    expect(result).toContain('--my-accent');
+    expect(result).not.toContain('--calendar-color-rgb');
+  });
+
+  it('emits color-mix() so opacity is applied to the variable color', () => {
+    const result = convertToRGBA('var(--my-accent)', 25);
+    expect(result).toBe('color-mix(in srgb, var(--my-accent) 25%, transparent)');
+  });
+
+  it('preserves var() with fallback', () => {
+    const result = convertToRGBA('var(--my-accent, red)', 80);
+    expect(result).toContain('var(--my-accent, red)');
+    expect(result).toContain('80%');
+  });
+
+  it('passes "transparent" through unchanged', () => {
+    expect(convertToRGBA('transparent', 50)).toBe('transparent');
+  });
+});
+
+//-----------------------------------------------------------------------------
+// E-8: formatRangeLabel try/catch wrapper
+//-----------------------------------------------------------------------------
+
+describe('formatRangeLabel (E-8 robustness wrapper)', () => {
+  it('returns empty string for an empty days array', () => {
+    expect(formatRangeLabel([], 'en')).toBe('');
+  });
+
+  it('falls back to "en" when given an invalid BCP-47 tag', () => {
+    const days = [new Date(2026, 4, 13)];
+    // "@@bogus@@" should throw RangeError inside Intl.DateTimeFormat; the
+    // wrapper must catch and re-format under "en" so the UI still gets a
+    // string instead of crashing the entire render.
+    const out = formatRangeLabel(days, '@@bogus@@');
+    expect(typeof out).toBe('string');
+    expect(out.length).toBeGreaterThan(0);
+  });
+
+  it('formats a single-day window with year', () => {
+    const days = [new Date(2026, 4, 13)];
+    const out = formatRangeLabel(days, 'en');
+    expect(out).toContain('2026');
+  });
+
+  it('formats a multi-day window in same year without repeating year on first', () => {
+    const days = [new Date(2026, 4, 13), new Date(2026, 4, 14), new Date(2026, 4, 15)];
+    const out = formatRangeLabel(days, 'en');
+    // First date: "13 May" (no year). Last date: "15 May 2026".
+    expect(out).toContain('2026');
+    expect(out.split('2026').length).toBe(2);
   });
 });

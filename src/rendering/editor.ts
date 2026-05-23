@@ -12,6 +12,7 @@
 
 import { LitElement, TemplateResult, html, nothing } from 'lit';
 import { property } from 'lit/decorators.js';
+import { ifDefined } from 'lit/directives/if-defined.js';
 import styles from './editor.styles';
 import * as Types from '../config/types';
 import * as Config from '../config/config';
@@ -508,6 +509,15 @@ export class CalendarCardProEditor extends LitElement {
     } else if (name === 'show_week_numbers' && value === 'null') {
       this.setConfigValue(name, null);
       return;
+    } else if (name === 'time_grid_interval_minutes' || name === 'time_grid_max_days') {
+      // Select-field values arrive as strings; the union types `15 | 30 | 60`
+      // and `1 | 3 | 7` require numeric storage so `validateTimeGridConfig`
+      // (which uses `[15, 30, 60].includes(value)` with strict equality)
+      // accepts them. Without coercion, valid selections would be reset to
+      // defaults on the next setConfig pass.
+      const numValue = typeof value === 'string' ? Number(value) : value;
+      this.setConfigValue(name, numValue);
+      return;
     }
 
     this.setConfigValue(name, value);
@@ -793,16 +803,26 @@ export class CalendarCardProEditor extends LitElement {
                   'time_grid_start_hour',
                   this._getTranslation('time_grid_start_hour'),
                   'number',
+                  undefined,
+                  { min: 0, max: 23, step: 1 },
                 )}
                 ${this.addTextField(
                   'time_grid_end_hour',
                   this._getTranslation('time_grid_end_hour'),
                   'number',
+                  undefined,
+                  { min: 1, max: 24, step: 1 },
                 )}
-                ${this.addTextField(
+                ${this.addSelectField(
                   'time_grid_interval_minutes',
                   this._getTranslation('time_grid_interval_minutes'),
-                  'number',
+                  [
+                    { value: '15', label: this._getTranslation('time_grid_interval_15') },
+                    { value: '30', label: this._getTranslation('time_grid_interval_30') },
+                    { value: '60', label: this._getTranslation('time_grid_interval_60') },
+                  ],
+                  false,
+                  String(this.getConfigValue('time_grid_interval_minutes') ?? ''),
                 )}
                 <div class="helper-text">
                   ${this._getTranslation('time_grid_interval_minutes_note')}
@@ -811,28 +831,42 @@ export class CalendarCardProEditor extends LitElement {
                   'time_grid_event_min_height_px',
                   this._getTranslation('time_grid_event_min_height_px'),
                   'number',
+                  undefined,
+                  { min: 1, max: 200, step: 1 },
                 )}
-                ${this.addTextField(
+                ${this.addSelectField(
                   'time_grid_max_days',
                   this._getTranslation('time_grid_max_days'),
-                  'number',
+                  [
+                    { value: '1', label: this._getTranslation('time_grid_max_1_day') },
+                    { value: '3', label: this._getTranslation('time_grid_max_3_days') },
+                    { value: '7', label: this._getTranslation('time_grid_max_7_days') },
+                  ],
+                  false,
+                  String(this.getConfigValue('time_grid_max_days') ?? ''),
                 )}
                 <div class="helper-text">${this._getTranslation('time_grid_max_days_note')}</div>
                 ${this.addTextField(
                   'time_grid_navigation_days',
                   this._getTranslation('time_grid_navigation_days'),
                   'number',
+                  undefined,
+                  { min: 1, max: 365, step: 1 },
                 )}
                 ${this._renderNavigationDaysHint()}
                 ${this.addTextField(
                   'time_grid_breakpoint_three_day_px',
                   this._getTranslation('time_grid_breakpoint_three_day_px'),
                   'number',
+                  undefined,
+                  { min: 1, step: 1 },
                 )}
                 ${this.addTextField(
                   'time_grid_breakpoint_seven_day_px',
                   this._getTranslation('time_grid_breakpoint_seven_day_px'),
                   'number',
+                  undefined,
+                  { min: 1, step: 1 },
                 )}
                 ${this.addBooleanField(
                   'time_grid_show_now_line',
@@ -842,6 +876,8 @@ export class CalendarCardProEditor extends LitElement {
                   'time_grid_allday_bg_opacity',
                   this._getTranslation('time_grid_allday_bg_opacity'),
                   'number',
+                  undefined,
+                  { min: 0, max: 100, step: 1 },
                 )}
               `,
               false,
@@ -1559,7 +1595,13 @@ export class CalendarCardProEditor extends LitElement {
    * @param defaultValue Default value
    * @returns Lit template for the text field
    */
-  addTextField(name: string, label?: string, type?: string, defaultValue?: string): TemplateResult {
+  addTextField(
+    name: string,
+    label?: string,
+    type?: string,
+    defaultValue?: string,
+    constraints?: { min?: number; max?: number; step?: number },
+  ): TemplateResult {
     let value = this.getConfigValue(name, defaultValue);
 
     // Convert undefined values to empty strings for better UX
@@ -1573,6 +1615,9 @@ export class CalendarCardProEditor extends LitElement {
         label="${label ?? this._getTranslation(name)}"
         type="${type ?? 'text'}"
         .value="${value}"
+        min="${ifDefined(constraints?.min)}"
+        max="${ifDefined(constraints?.max)}"
+        step="${ifDefined(constraints?.step)}"
         @keyup="${this._valueChanged}"
         @change="${this._valueChanged}"
       ></ha-textfield>

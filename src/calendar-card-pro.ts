@@ -35,6 +35,7 @@ import { ResponsiveColumnsController } from './controllers/responsive-columns-co
 import * as Localize from './translations/localize';
 import * as EventUtils from './utils/events';
 import * as Actions from './interaction/actions';
+import * as FormatUtils from './utils/format';
 import * as Grid from './utils/grid';
 import * as Helpers from './utils/helpers';
 import * as Logger from './utils/logger';
@@ -443,11 +444,16 @@ class CalendarCardPro extends LitElement {
     const reference = Grid.getReferenceDate(this.config);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const firstDayOfWeek = FormatUtils.getFirstDayOfWeek(
+      this.config.first_day_of_week,
+      this.effectiveLanguage,
+    );
     return Grid.computeTodayOffset(
       reference,
       today,
       this.visibleDays,
       this.config.time_grid_navigation_days,
+      firstDayOfWeek,
     );
   }
 
@@ -704,50 +710,8 @@ class CalendarCardPro extends LitElement {
     } else if (!this.safeHass || !this.config.entities.length) {
       // Error state - missing entities
       content = Render.renderCardContent('error', this.effectiveLanguage);
-    } else if (this.config.view === 'time-grid') {
-      content = RenderGrid.renderTimeGrid(
-        this.events,
-        this.config,
-        this.effectiveLanguage,
-        {
-          visibleDays: this.visibleDays,
-          offsetDays: this.viewOffsetDays,
-          now: this._nowLine.now,
-          onShiftDay: (d) => this._shiftDays(d),
-          onShiftWindow: (d) => this._shiftDays(d * this.visibleDays),
-          onResetToToday: () => {
-            this.viewOffsetDays = this._todayOffset();
-          },
-          canShiftBack: this.viewOffsetDays > 0,
-          canShiftForward: this.viewOffsetDays < this._maxOffset(),
-        },
-        this.safeHass,
-      );
-    } else if (this.events.length === 0) {
-      // Even with no events, use the regular groupEventsByDay function
-      // which now handles empty API results correctly
-      const groupedEmptyDays = EventUtils.groupEventsByDay(
-        [], // Empty events array
-        this.config,
-        this.isExpanded,
-        this.effectiveLanguage,
-      );
-      content = Render.renderGroupedEvents(
-        groupedEmptyDays,
-        this.config,
-        this.effectiveLanguage,
-        this.weatherForecasts,
-        this.safeHass,
-      );
     } else {
-      // Normal state with events - use renderGroupedEvents to handle week numbers and separators
-      content = Render.renderGroupedEvents(
-        this.groupedEvents,
-        this.config,
-        this.effectiveLanguage,
-        this.weatherForecasts,
-        this.safeHass,
-      );
+      content = this._renderView(this.config.view);
     }
 
     // Render main card structure with content
@@ -758,6 +722,71 @@ class CalendarCardPro extends LitElement {
       handlers,
       false,
       this.isLoading,
+    );
+  }
+
+  /**
+   * Dispatch on the view discriminator. The `never` fallthrough makes adding a
+   * new variant to `Config['view']` a TypeScript compile error here, preventing
+   * silent regressions like a future `'month-grid'` falling through to the list
+   * renderer (E-3).
+   */
+  private _renderView(view: Types.Config['view']): TemplateResult {
+    switch (view) {
+      case 'list':
+        return this._renderListView();
+      case 'time-grid':
+        return this._renderTimeGridView();
+      default: {
+        const _exhaustive: never = view;
+        throw new Error(`Unhandled view variant: ${String(_exhaustive)}`);
+      }
+    }
+  }
+
+  private _renderListView(): TemplateResult {
+    if (this.events.length === 0) {
+      const groupedEmptyDays = EventUtils.groupEventsByDay(
+        [],
+        this.config,
+        this.isExpanded,
+        this.effectiveLanguage,
+      );
+      return Render.renderGroupedEvents(
+        groupedEmptyDays,
+        this.config,
+        this.effectiveLanguage,
+        this.weatherForecasts,
+        this.safeHass,
+      );
+    }
+    return Render.renderGroupedEvents(
+      this.groupedEvents,
+      this.config,
+      this.effectiveLanguage,
+      this.weatherForecasts,
+      this.safeHass,
+    );
+  }
+
+  private _renderTimeGridView(): TemplateResult {
+    return RenderGrid.renderTimeGrid(
+      this.events,
+      this.config,
+      this.effectiveLanguage,
+      {
+        visibleDays: this.visibleDays,
+        offsetDays: this.viewOffsetDays,
+        now: this._nowLine.now,
+        onShiftDay: (d) => this._shiftDays(d),
+        onShiftWindow: (d) => this._shiftDays(d * this.visibleDays),
+        onResetToToday: () => {
+          this.viewOffsetDays = this._todayOffset();
+        },
+        canShiftBack: this.viewOffsetDays > 0,
+        canShiftForward: this.viewOffsetDays < this._maxOffset(),
+      },
+      this.safeHass,
     );
   }
 }

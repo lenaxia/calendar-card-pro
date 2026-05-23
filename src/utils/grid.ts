@@ -446,9 +446,13 @@ export function splitTimedEventByDay(
 //-----------------------------------------------------------------------------
 
 /**
- * Computes the reference start date for the time-grid view. Replicates the
- * behavior of the private `getStartDateReference` in events.ts via the public
- * getTimeWindow API. Returns local midnight.
+ * Computes the reference start date for the time-grid view. Returns local
+ * midnight.
+ *
+ * Note: this duplicates the math in `getStartDateReference` (private to
+ * `events.ts`). The duplication is mandated by AGENTS.md Rule 5 — we cannot
+ * modify `events.ts` to export the existing function. If Rule 5 is ever
+ * lifted, this helper should delegate to the events-side version.
  *
  * @param config - subset of Config with `start_date` and `days_to_show`
  */
@@ -548,10 +552,15 @@ export function buildGridFetchConfig(config: Types.Config): Types.Config {
 }
 
 /**
- * Whether `event` is past relative to `now`. Replicates the list-view semantics
- * in render.ts: timed events compare end-time strictly after `now`; all-day
- * events apply iCal exclusive-end-adjustment (subtract one day) and compare
- * `today > endDate` at local-midnight granularity.
+ * Whether `event` is past relative to `now`. Timed events compare end-time
+ * strictly after `now`; all-day events apply iCal exclusive-end-adjustment
+ * (subtract one day) and compare `today > endDate` at local-midnight
+ * granularity.
+ *
+ * Note: this duplicates the past-event math inlined at `render.ts:798-832`
+ * (list-view path). The duplication is mandated by AGENTS.md Rule 5 — we
+ * cannot modify `render.ts`. If Rule 5 is ever lifted, both paths should
+ * share this helper.
  */
 export function isPastEvent(event: Types.CalendarEventData, now: Date): boolean {
   const isAllDay = !event.start.dateTime;
@@ -571,11 +580,13 @@ export function isPastEvent(event: Types.CalendarEventData, now: Date): boolean 
 
 /**
  * Hour axis label. Pure hour-only formatting (no minutes — that would waste
- * axis width). 24-hour mode emits the hour as a string; 12-hour mode emits
- * "12 AM", "1 AM"…"12 PM", "1 PM"…"11 PM".
+ * axis width). 24-hour mode emits the hour zero-padded to two digits ("00",
+ * "01", …, "23") so all rows align visually and `0` isn't ambiguous with
+ * a single-digit timestamp. 12-hour mode emits "12 AM", "1 AM"…"12 PM",
+ * "1 PM"…"11 PM" (no padding — the AM/PM suffix already disambiguates).
  */
 export function formatHourLabel(hour: number, use24h: boolean): string {
-  if (use24h) return String(hour);
+  if (use24h) return String(hour).padStart(2, '0');
   if (hour === 0) return '12 AM';
   if (hour < 12) return `${hour} AM`;
   if (hour === 12) return '12 PM';
@@ -676,20 +687,43 @@ export function computeBannerPlacement(
 
 /**
  * Compute the offset (in days from the fetch reference) needed to bring today
- * into the navigable range. Used by the host's onResetToToday handler so
+ * into the visible window. Used by the host's onResetToToday handler so
  * clicking "Today" works even when start_date moves the reference away from
- * today. Clamps into the valid offset range [0, navigationDays - visibleDays];
- * a future start_date (today < reference) yields 0 (R-22 in the design doc).
+ * today.
+ *
+ * For 1- and 3-day modes (no week snap), clamps into [0, navigationDays - visibleDays].
+ * For 7-day mode, the renderer snaps the window backward to `firstDayOfWeek`,
+ * so a clamped offset can yield a window that does NOT contain today (E-1).
+ * In that mode we instead return the offset whose snapped window contains
+ * today's week — `daysBetween(ref, startOfWeek(today, firstDayOfWeek))` —
+ * even when that exceeds `navigationDays - visibleDays`. The "Today" button's
+ * job is to put today in view; navigation arrows separately enforce
+ * `_maxOffset` for sequential paging.
+ *
+ * A future start_date (today < reference) yields 0 (R-22 in the design doc).
  */
 export function computeTodayOffset(
   reference: Date,
   today: Date,
   visibleDays: 1 | 3 | 7,
   navigationDays: number,
+  firstDayOfWeek: 0 | 1,
 ): number {
   const diffDays = daysBetween(reference, today);
-  const max = Math.max(0, navigationDays - visibleDays);
-  return Math.max(0, Math.min(max, diffDays));
+  if (diffDays < 0) return 0;
+
+  if (visibleDays !== 7) {
+    const max = Math.max(0, navigationDays - visibleDays);
+    return Math.min(max, diffDays);
+  }
+
+  // 7-day mode: any offset whose snapped window contains today's week works.
+  // snapToWindow does `startOfWeek(ref + offset, fdow)`. Picking
+  // offset = daysBetween(ref, startOfWeek(today, fdow)) makes the snap a
+  // no-op and the resulting window is [todayWeekStart, todayWeekStart + 7).
+  const todayWeekStart = startOfWeek(today, firstDayOfWeek);
+  const targetOffset = daysBetween(reference, todayWeekStart);
+  return Math.max(0, targetOffset);
 }
 
 /**

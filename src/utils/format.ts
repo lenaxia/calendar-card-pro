@@ -297,7 +297,7 @@ export function getSimpleWeekNumber(date: Date, firstDayOfWeek: number = 0): num
 export function getFirstDayOfWeek(
   firstDayConfig: 'sunday' | 'monday' | 'system',
   locale: string = 'en',
-): number {
+): 0 | 1 {
   // Explicit setting takes precedence
   if (firstDayConfig === 'sunday') return 0;
   if (firstDayConfig === 'monday') return 1;

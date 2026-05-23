@@ -16,6 +16,7 @@ import * as EventUtils from '../utils/events';
 import * as FormatUtils from '../utils/format';
 import * as Grid from '../utils/grid';
 import * as Helpers from '../utils/helpers';
+import * as Logger from '../utils/logger';
 
 //-----------------------------------------------------------------------------
 // PUBLIC TYPES
@@ -47,7 +48,7 @@ interface BucketedDays {
   hiddenCounts: number[];
 }
 
-interface AllDayBanner {
+export interface AllDayBanner {
   event: Types.CalendarEventData;
   placement: Grid.BannerPlacement;
   span: number;
@@ -57,6 +58,20 @@ interface AllDayBanner {
 //-----------------------------------------------------------------------------
 // CONSTANTS
 //-----------------------------------------------------------------------------
+
+/**
+ * Higher-order helper for navigation button click handlers. The card root
+ * registers pointer/tap-action listeners that bubble; nav clicks must stop
+ * propagation so a click on `<` does not also fire the card's tap_action.
+ * Module-scoped so the outer closure is stable across renders (only the
+ * inner closure is fresh per template binding).
+ */
+const navClick =
+  (handler: () => void) =>
+  (e: Event): void => {
+    e.stopPropagation();
+    handler();
+  };
 
 /**
  * The time-axis column width is owned by CSS (`--calendar-card-grid-time-axis-width`,
@@ -91,8 +106,28 @@ export function renderTimeGrid(
   ctx: TimeGridContext,
   hass?: Types.Hass | null,
 ): TemplateResult {
+  try {
+    return renderTimeGridUnsafe(events, config, language, ctx, hass);
+  } catch (err) {
+    Logger.error('Failed to render time-grid view', err);
+    const errorLabel = String(Localize.translate(language, 'error', 'Error loading calendar'));
+    return html`
+      <div class="calendar-card">
+        <div class="error">${errorLabel}</div>
+      </div>
+    `;
+  }
+}
+
+function renderTimeGridUnsafe(
+  events: ReadonlyArray<Types.CalendarEventData>,
+  config: Types.Config,
+  language: string,
+  ctx: TimeGridContext,
+  hass?: Types.Hass | null,
+): TemplateResult {
   const reference = Grid.getReferenceDate(config);
-  const firstDayOfWeek = FormatUtils.getFirstDayOfWeek(config.first_day_of_week, language) as 0 | 1;
+  const firstDayOfWeek = FormatUtils.getFirstDayOfWeek(config.first_day_of_week, language);
   const { start: windowStart, days } = Grid.snapToWindow(
     reference,
     ctx.offsetDays,
@@ -136,7 +171,7 @@ export function renderTimeGrid(
     minHeightPx,
   });
 
-  const allDayBanners = buildAllDayBanners(events, windowStart, ctx.visibleDays);
+  const allDayBanners = buildAllDayBanners(events, windowStart, ctx.visibleDays, config, ctx.now);
 
   const hourLabels = buildHourLabels(config.time_grid_start_hour, config.time_grid_end_hour);
   const gridColumns = buildGridColumns(days.length);
@@ -156,12 +191,8 @@ export function renderTimeGrid(
     Localize.translate(language, 'time_grid_hidden_events_aria', '{n} hidden events'),
   );
 
-  const navClick = (handler: () => void) => (e: Event) => {
-    e.stopPropagation();
-    handler();
-  };
-  const backDisabled = ctx.canShiftBack ? 'false' : 'true';
-  const forwardDisabled = ctx.canShiftForward ? 'false' : 'true';
+  const backDisabled = !ctx.canShiftBack;
+  const forwardDisabled = !ctx.canShiftForward;
 
   return html`
     <div class="ccp-grid">
@@ -169,7 +200,7 @@ export function renderTimeGrid(
         <button
           class="ccp-grid-prev-window"
           aria-label=${prevWindowLabel}
-          aria-disabled=${backDisabled}
+          ?disabled=${backDisabled}
           @click=${navClick(() => ctx.onShiftWindow(-1))}
         >
           «
@@ -178,7 +209,7 @@ export function renderTimeGrid(
           ? html`<button
               class="ccp-grid-prev-day"
               aria-label=${prevDayLabel}
-              aria-disabled=${backDisabled}
+              ?disabled=${backDisabled}
               @click=${navClick(() => ctx.onShiftDay(-1))}
             >
               ‹
@@ -195,7 +226,7 @@ export function renderTimeGrid(
           ? html`<button
               class="ccp-grid-next-day"
               aria-label=${nextDayLabel}
-              aria-disabled=${forwardDisabled}
+              ?disabled=${forwardDisabled}
               @click=${navClick(() => ctx.onShiftDay(1))}
             >
               ›
@@ -204,7 +235,7 @@ export function renderTimeGrid(
         <button
           class="ccp-grid-next-window"
           aria-label=${nextWindowLabel}
-          aria-disabled=${forwardDisabled}
+          ?disabled=${forwardDisabled}
           @click=${navClick(() => ctx.onShiftWindow(1))}
         >
           »
@@ -391,14 +422,24 @@ function renderEventBlock(
 // ALL-DAY BANNERS
 //-----------------------------------------------------------------------------
 
-function buildAllDayBanners(
+/**
+ * Builds the all-day banner placement records for the visible window. Exported
+ * so the H-4 regression test can verify the `show_past_events: false` filter
+ * (E-10) is applied symmetrically with the timed-event filter.
+ */
+export function buildAllDayBanners(
   events: ReadonlyArray<Types.CalendarEventData>,
   windowStart: Date,
   visibleDays: 1 | 3 | 7,
+  config: Types.Config,
+  now: Date,
 ): AllDayBanner[] {
   const banners: AllDayBanner[] = [];
   for (const event of events) {
     if (event.start.dateTime || !event.start.date || !event.end?.date) continue;
+    // Match the timed-event filter at bucketAndPlaceEvents: when show_past_events
+    // is false, hide all-day banners whose end has passed (E-10).
+    if (!config.show_past_events && Grid.isPastEvent(event, now)) continue;
 
     const eventStartDay = FormatUtils.parseAllDayDate(event.start.date);
     const eventEndDay = FormatUtils.parseAllDayDate(event.end.date);
@@ -502,39 +543,69 @@ function eventEndMs(event: Types.CalendarEventData): number | null {
   return null;
 }
 
+/**
+ * Memoized `Intl.DateTimeFormat` factory. The grid view constructs up to 5
+ * formatters per render (weekday × N day columns, month × N, range label
+ * fmtSame + fmtFull). Without caching, a 7-day grid pays ~14 Intl
+ * construction calls per render — non-trivial relative to the rest of the
+ * pipeline. Bounded LRU keeps memory flat in pathological multi-language
+ * UIs (most users see ≤2 distinct keys).
+ */
+const FORMATTER_CACHE_LIMIT = 16;
+const formatterCache = new Map<string, Intl.DateTimeFormat>();
+
+function getFormatter(language: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const key = `${language}|${JSON.stringify(options)}`;
+  let f = formatterCache.get(key);
+  if (f) {
+    formatterCache.delete(key);
+    formatterCache.set(key, f);
+    return f;
+  }
+  f = new Intl.DateTimeFormat(language, options);
+  formatterCache.set(key, f);
+  if (formatterCache.size > FORMATTER_CACHE_LIMIT) {
+    const oldest = formatterCache.keys().next().value;
+    if (oldest !== undefined) formatterCache.delete(oldest);
+  }
+  return f;
+}
+
 function formatWeekday(day: Date, language: string): string {
   try {
-    return new Intl.DateTimeFormat(language, { weekday: 'short' }).format(day);
+    return getFormatter(language, { weekday: 'short' }).format(day);
   } catch {
-    return new Intl.DateTimeFormat('en', { weekday: 'short' }).format(day);
+    return getFormatter('en', { weekday: 'short' }).format(day);
   }
 }
 
 function formatMonth(day: Date, language: string): string {
   try {
-    return new Intl.DateTimeFormat(language, { month: 'short' }).format(day);
+    return getFormatter(language, { month: 'short' }).format(day);
   } catch {
-    return new Intl.DateTimeFormat('en', { month: 'short' }).format(day);
+    return getFormatter('en', { month: 'short' }).format(day);
   }
 }
 
-function formatRangeLabel(days: Date[], language: string): string {
+export function formatRangeLabel(days: Date[], language: string): string {
+  try {
+    return formatRangeLabelUnsafe(days, language);
+  } catch {
+    return formatRangeLabelUnsafe(days, 'en');
+  }
+}
+
+function formatRangeLabelUnsafe(days: Date[], language: string): string {
   if (days.length === 0) return '';
   const first = days[0];
   const last = days[days.length - 1];
   if (days.length === 1) {
-    return new Intl.DateTimeFormat(language, {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    }).format(first);
+    return getFormatter(language, { day: 'numeric', month: 'short', year: 'numeric' }).format(
+      first,
+    );
   }
-  const fmtSame = new Intl.DateTimeFormat(language, { day: 'numeric', month: 'short' });
-  const fmtFull = new Intl.DateTimeFormat(language, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  const fmtSame = getFormatter(language, { day: 'numeric', month: 'short' });
+  const fmtFull = getFormatter(language, { day: 'numeric', month: 'short', year: 'numeric' });
   if (first.getFullYear() === last.getFullYear()) {
     return `${fmtSame.format(first)} – ${fmtFull.format(last)}`;
   }
