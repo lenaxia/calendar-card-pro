@@ -698,6 +698,33 @@ Available indicator types:
 
 The `today_indicator_position` parameter accepts CSS-like position values in the format "x% y%", allowing precise placement of the indicator anywhere within the date column.
 
+### 🕒 Time-Grid View
+
+A Google-Calendar–style view that places timed events on a 2-D plane: vertical = time of day, horizontal = days. Responsive: 1 column on mobile, 3 on tablet, 7 on desktop (configurable breakpoints). Multi-day all-day events render as horizontal banners across the top, with `◂` / `▸` indicators when an event extends beyond the visible window. A live "now" line on today's column shows the current time and updates every minute.
+
+Enable it with `view: time-grid`:
+
+```yaml
+type: custom:calendar-card-pro
+entities:
+  - calendar.work
+  - calendar.personal
+view: time-grid
+time_grid_navigation_days: 28
+```
+
+**Navigation**: `«` `‹` `Today` `›` `»` buttons let you scroll forward and backward through the configured `time_grid_navigation_days` window (default 28 days). At 7-day width the single-step `‹` `›` are hidden because the window snaps to whole weeks; at 1- and 3-day width all five buttons are shown.
+
+**Notes:**
+
+- `view: 'time-grid'` decouples its fetch range from `days_to_show`. The grid uses `time_grid_navigation_days` (default 28); `days_to_show` continues to drive list view only.
+- Events display in the browser's local timezone, not Home Assistant's server timezone.
+- All-day events render as horizontal banners across the top of the grid; timed events sit on the time axis.
+- `tap_action: 'expand'` is a no-op in grid view (the list-view-only "compact / expanded" toggle does not apply).
+- All `time_grid_*` fields are validated by `setConfig`: invalid values are coerced to defaults with a console warning.
+
+See section 6 below for the full list of `time_grid_*` configuration options.
+
 ### Event Content & Display
 
 #### 📅 Calendar Events Display
@@ -1289,6 +1316,18 @@ These examples demonstrate how Calendar Card Pro can be customized to match any 
 | **Cache and Refresh**                      |                   |                                                    |                                                                                                                                                                                                                                                             |
 | `refresh_interval`                         | number            | `30`                                               | Time in minutes between data refreshes                                                                                                                                                                                                                      |
 | `refresh_on_navigate`                      | boolean           | `true`                                             | Whether to force refresh data when navigating between dashboard views                                                                                                                                                                                       |
+| **Time-Grid View**                         |                   |                                                    |                                                                                                                                                                                                                                                             |
+| `view`                                     | string            | `list`                                             | View mode: `list` (default) or `time-grid` (Google-Calendar-style 2-D placement)                                                                                                                                                                            |
+| `time_grid_start_hour`                     | number            | `6`                                                | First hour rendered on the time axis (0–23)                                                                                                                                                                                                                 |
+| `time_grid_end_hour`                       | number            | `22`                                               | Last hour rendered on the time axis (1–24, must be greater than start)                                                                                                                                                                                       |
+| `time_grid_interval_minutes`               | number            | `30`                                               | Slot interval in minutes — allowed: 15, 30, 60                                                                                                                                                                                                              |
+| `time_grid_event_min_height_px`            | number            | `24`                                               | Minimum event block height in pixels (short events clamp up to this)                                                                                                                                                                                        |
+| `time_grid_max_days`                       | number            | `7`                                                | Maximum number of day columns shown — allowed: 1, 3, 7                                                                                                                                                                                                      |
+| `time_grid_navigation_days`                | number            | `28`                                               | Days of events fetched for grid view (independent of `days_to_show`); the user can navigate forward/backward within this range                                                                                                                              |
+| `time_grid_breakpoint_three_day_px`        | number            | `500`                                              | Card width (px) at or above which the grid switches from 1-column to 3-column                                                                                                                                                                               |
+| `time_grid_breakpoint_seven_day_px`        | number            | `900`                                              | Card width (px) at or above which the grid switches from 3-column to 7-column                                                                                                                                                                               |
+| `time_grid_show_now_line`                  | boolean           | `true`                                             | Show a live "current time" line on today's column (updates every minute)                                                                                                                                                                                    |
+| `time_grid_allday_bg_opacity`              | number            | `20`                                               | Background opacity of all-day banners (0–100; matches the existing `event_background_opacity` scale)                                                                                                                                                       |
 
 <p align="right"><a href="#top">⬆️ back to top</a></p>
 

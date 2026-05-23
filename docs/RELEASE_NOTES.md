@@ -1,3 +1,44 @@
+# Unreleased
+
+**Time-grid view (Google Calendar–style)** addressing [#300](https://github.com/alexpfau/calendar-card-pro/issues/300). Opt in via `view: time-grid`; the existing list view is byte-identical and remains the default.
+
+## 🎉 New Features
+
+### 🕒 Time-Grid View
+
+A 2-D calendar view: vertical = time of day, horizontal = days. Multi-day all-day events render as horizontal banners at the top, with `◂` / `▸` indicators for events that extend beyond the visible window. A live "now" line on today's column updates every minute and migrates to the new day-column at midnight rollover.
+
+- **Responsive columns**: 1 / 3 / 7 days based on the card's rendered width via `ResizeObserver`. Breakpoints are configurable (`time_grid_breakpoint_three_day_px`, `time_grid_breakpoint_seven_day_px`).
+- **Week alignment**: at 7-day width the window snaps to the configured first day of the week (Mon by default, Sun per `first_day_of_week`). At 1- and 3-day width the window is rolling.
+- **Navigation**: `«` `‹` `Today` `›` `»` buttons let users scroll forward/backward within `time_grid_navigation_days` (default 28). The `‹` / `›` single-step buttons are hidden in 7-day mode (window snaps to weeks).
+- **Decoupled fetch range**: `time_grid_navigation_days` is independent of `days_to_show` (which still drives list view). Toggling `view` triggers a refetch via the now view-aware `hasConfigChanged`.
+- **Visual editor support**: the new "Time grid" expansion panel exposes all `time_grid_*` knobs; the list-only sections (Compact Mode, `days_to_show`, `show_empty_days`) hide when grid view is active. `show_past_events`, `filter_duplicates` apply to both views.
+- **Accessibility**: nav buttons have `aria-label` strings (with `{n}` substitution for the window-shift labels) and `aria-disabled='true'`/`'false'` at edges.
+- **Performance**: the now-line position is updated by direct `style.top` mutation (no full re-render); the interval pauses when the tab is hidden.
+- **Card-mod / theme**: three new CSS custom properties — `--calendar-card-grid-time-axis-width` (default `48px`), `--calendar-card-grid-event-radius` (default `4px`), `--calendar-card-grid-allday-max-height` (default `6em`).
+
+11 new flat scalar config fields (`view`, `time_grid_start_hour`, `time_grid_end_hour`, `time_grid_interval_minutes`, `time_grid_event_min_height_px`, `time_grid_show_now_line`, `time_grid_max_days`, `time_grid_breakpoint_three_day_px`, `time_grid_breakpoint_seven_day_px`, `time_grid_navigation_days`, `time_grid_allday_bg_opacity`); see README.md section 6 for the full table. All have safe defaults; `setConfig` validates and coerces invalid values to defaults with a console warning.
+
+### 🛠️ Other improvements
+
+- New pure-helper module `src/utils/grid.ts` with 92 unit tests (Vitest) covering date math, event placement, overlap layout, banner placement, now-line position, today-offset, card size, and DST safety. The test framework is new to this repo; pure helpers in future work should follow the same pattern.
+
+## 🔧 Compatibility
+
+- **List view byte-identical**: `src/rendering/render.ts` is unchanged from v3.2.0. `src/utils/events.ts` adds exactly one optional argument (`effectiveDaysToShow?: number`) to `fetchEventData`; existing callers pass nothing → behavior unchanged.
+- **No breaking changes**: all new fields are optional with safe defaults. Existing configs continue to work without modification.
+- **HA versions**: same as v3.2.0 (HA 2026.3+).
+
+## 📈 Bundle size
+
+`dist/calendar-card-pro.js` grows from 288,879 bytes (v3.2.0) to ~313 KB — well under the +20 KB design budget when accounting for the renderer, helpers, and CSS.
+
+## 🌍 Translations
+
+English (`en.json`) covers all new editor labels, navigation aria strings, and the "Today" button label. Other 32 languages fall back to English automatically; per-language translations land as follow-up PRs.
+
+---
+
 # Calendar Card Pro v3.2.0
 
 **Event descriptions, weather UV index, RTL support, and Home Assistant 2026.3 compatibility.** This release introduces major new display features alongside critical compatibility updates and significant bug fixes.
