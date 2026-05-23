@@ -77,4 +77,18 @@ describe('buildAllDayBanners (H-4: show_past_events filter for all-day banners, 
     expect(banners.length).toBe(1);
     expect(banners[0].event.summary).toBe('ongoing banner');
   });
+
+  it('H-5: malformed events do not crash buildAllDayBanners', () => {
+    const config = makeConfig({ show_past_events: true });
+    // Each malformed event should be silently skipped, not throw.
+    const malformed = [
+      { start: { date: 'not-a-date' }, end: { date: '2026-05-15' } },
+      { start: { date: '2026-05-12' }, end: undefined },
+      { start: {}, end: {} },
+      { start: { date: '2026-05-12' }, end: { date: '2026-05-08' } }, // end < start
+    ] as unknown as Types.CalendarEventData[];
+    expect(() =>
+      buildAllDayBanners(malformed, windowStart, visibleDays, config, now),
+    ).not.toThrow();
+  });
 });

@@ -187,6 +187,14 @@ describe('chooseVisibleDays', () => {
     expect(chooseVisibleDays(899, 500, 900, 7)).toBe(3);
   });
 
+  it('G-3.1: width=899 with cap=3 returns 3 (W-1 boundary)', () => {
+    expect(chooseVisibleDays(899, 500, 900, 3)).toBe(3);
+  });
+
+  it('G-3.1: width=899 with cap=1 returns 1 (cap dominates)', () => {
+    expect(chooseVisibleDays(899, 500, 900, 1)).toBe(1);
+  });
+
   it('G-3.1: width=900 returns 7', () => {
     expect(chooseVisibleDays(900, 500, 900, 7)).toBe(7);
   });
@@ -361,6 +369,21 @@ describe('splitTimedEventByDay', () => {
     expect(segs).toHaveLength(1);
     expect(segs[0].start.dateTime).toBe(isoLocal(2026, 5, 13, 9, 0));
     expect(segs[0].end.dateTime).toBe(isoLocal(2026, 5, 13, 11, 0));
+  });
+
+  it('H-2 (DST regression): split across fall-back midnight produces two segments', () => {
+    // 2026 US DST fall-back is 2026-11-01 02:00 → 01:00 (clocks turn back, gain
+    // an hour). An event 2026-10-31 23:00 → 2026-11-01 03:00 LOCAL crosses
+    // midnight AND the DST transition. Verify the splitter produces 2 segments
+    // (one per civil day) without crashing or producing a zero-duration tail.
+    // Note: spring-forward (2026-03-08 02:00 LOCAL is a skipped time) is not
+    // round-trip-safe at the JS Date layer regardless of our code, so we test
+    // fall-back which has unambiguous local times throughout.
+    const ev = timed(isoLocal(2026, 10, 31, 23, 0), isoLocal(2026, 11, 1, 3, 0));
+    const segs = splitTimedEventByDay(ev, new Date(2026, 9, 31), new Date(2026, 10, 2));
+    expect(segs).toHaveLength(2);
+    expect(segs[0].start.dateTime).toBe(isoLocal(2026, 10, 31, 23, 0));
+    expect(segs[1].end.dateTime).toBe(isoLocal(2026, 11, 1, 3, 0));
   });
 });
 
