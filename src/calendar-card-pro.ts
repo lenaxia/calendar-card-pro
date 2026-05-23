@@ -653,11 +653,14 @@ class CalendarCardPro extends LitElement {
       await this.updateComplete;
 
       // Get event data (from cache or API) using modularized function
+      const effectiveDays =
+        this.config.view === 'time-grid' ? this.config.time_grid_navigation_days : undefined;
       const eventData = await EventUtils.fetchEventData(
         this.safeHass,
         this.config,
         this._instanceId,
         force,
+        effectiveDays,
       );
 
       this.isLoading = false;

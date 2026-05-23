@@ -243,9 +243,13 @@ export function hasConfigChanged(
   const refreshIntervalChanged = previous?.refresh_interval !== current?.refresh_interval;
 
   // Check if core data-affecting properties changed
+  const isGridView = current.view === 'time-grid';
+  const viewChanged = previous.view !== current.view;
   const dataChanged =
+    viewChanged ||
     previousEntityIds !== currentEntityIds ||
-    previous.days_to_show !== current.days_to_show ||
+    (!isGridView && previous.days_to_show !== current.days_to_show) ||
+    (isGridView && previous.time_grid_navigation_days !== current.time_grid_navigation_days) ||
     previous.start_date !== current.start_date ||
     previous.show_past_events !== current.show_past_events ||
     previous.filter_duplicates !== current.filter_duplicates;
