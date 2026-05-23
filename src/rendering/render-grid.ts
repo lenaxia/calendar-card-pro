@@ -60,7 +60,15 @@ interface AllDayBanner {
 // CONSTANTS
 //-----------------------------------------------------------------------------
 
-const TIME_AXIS_WIDTH_PX = 60;
+/**
+ * The time-axis column width is owned by CSS (`--calendar-card-grid-time-axis-width`,
+ * default 48px). The renderer references that CSS variable in its inline
+ * `grid-template-columns` so the header row and the body grid stay aligned even
+ * when card-mod or theme overrides the variable. Do not duplicate the value
+ * here in JS — historic versions did, and the JS/CSS values drifted (header
+ * 60px, body 48px → 12px column misalignment under default theme).
+ */
+const TIME_AXIS_WIDTH_CSS = 'var(--calendar-card-grid-time-axis-width, 48px)';
 const TIME_VISIBLE_HEIGHT_PX = 32;
 const LOCATION_VISIBLE_HEIGHT_PX = 56;
 
@@ -117,8 +125,7 @@ export function renderTimeGrid(
   const allDayBanners = buildAllDayBanners(events, windowStart, ctx.visibleDays);
 
   const hourLabels = buildHourLabels(config.time_grid_start_hour, config.time_grid_end_hour);
-  const headerColumns = buildGridTemplateColumns(days.length);
-  const bodyColumns = buildBodyColumns(days.length);
+  const gridColumns = buildGridColumns(days.length);
 
   const todayLabel = String(Localize.translate(language, 'time_grid_today', 'Today'));
   const prevDayLabel = String(
@@ -187,7 +194,7 @@ export function renderTimeGrid(
         </button>
         <span class="ccp-grid-range">${formatRangeLabel(days, language)}</span>
       </div>
-      <div class="ccp-grid-headers" style=${styleMap({ gridTemplateColumns: headerColumns })}>
+      <div class="ccp-grid-headers" style=${styleMap({ gridTemplateColumns: gridColumns })}>
         <div class="ccp-grid-axis-spacer"></div>
         ${days.map(
           (day, i) => html`
@@ -204,11 +211,11 @@ export function renderTimeGrid(
       ${allDayBanners.length === 0
         ? nothing
         : html`
-            <div class="ccp-grid-allday" style=${styleMap({ gridTemplateColumns: headerColumns })}>
+            <div class="ccp-grid-allday" style=${styleMap({ gridTemplateColumns: gridColumns })}>
               ${allDayBanners.map((banner) => renderAllDayBanner(banner, config, ctx.now))}
             </div>
           `}
-      <div class="ccp-grid-body" style=${styleMap({ gridTemplateColumns: bodyColumns })}>
+      <div class="ccp-grid-body" style=${styleMap({ gridTemplateColumns: gridColumns })}>
         <div class="ccp-grid-time-axis">
           ${hourLabels.map(
             (h) => html`<div class="ccp-grid-hour-label">${Grid.formatHourLabel(h, use24h)}</div>`,
@@ -455,12 +462,8 @@ function buildHourLabels(startHour: number, endHour: number): number[] {
   return out;
 }
 
-function buildGridTemplateColumns(visibleDays: number): string {
-  return `${TIME_AXIS_WIDTH_PX}px repeat(${visibleDays}, minmax(0, 1fr))`;
-}
-
-function buildBodyColumns(visibleDays: number): string {
-  return `${TIME_AXIS_WIDTH_PX}px repeat(${visibleDays}, minmax(0, 1fr))`;
+function buildGridColumns(visibleDays: number): string {
+  return `${TIME_AXIS_WIDTH_CSS} repeat(${visibleDays}, minmax(0, 1fr))`;
 }
 
 function computeTodayIdx(windowStart: Date, now: Date, visibleDays: 1 | 3 | 7): number {

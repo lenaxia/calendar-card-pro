@@ -217,6 +217,138 @@ export function normalizeEntities(
 }
 
 /**
+ * Coerces invalid time-grid config fields back to safe values, in place.
+ *
+ * Each invalid field is replaced individually (so a typo on `start_hour` does
+ * not silently rewrite a valid `end_hour`). When a paired invariant is
+ * violated (`start_hour >= end_hour`, or `max_days > navigation_days`) both
+ * sides of the pair are reset because we cannot infer the user's intent.
+ *
+ * Logger.warn is emitted for every coercion so users see what happened in
+ * devtools; the card itself remains functional rather than throwing.
+ *
+ * Pure-ish: mutates the passed-in object (matches setConfig's existing
+ * pattern) but returns it for fluent use in tests.
+ *
+ * @param config - merged config (DEFAULT_CONFIG ⨯ user input)
+ * @returns the same object reference, with invalid fields coerced
+ */
+export function validateTimeGridConfig(config: Types.Config): Types.Config {
+  if (config.view !== 'list' && config.view !== 'time-grid') {
+    Logger.warn(`Invalid view '${config.view}', falling back to 'list'`);
+    config.view = 'list';
+  }
+
+  const sh = config.time_grid_start_hour;
+  const eh = config.time_grid_end_hour;
+  const startInvalid = !Number.isInteger(sh) || sh < 0 || sh > 23;
+  const endInvalid = !Number.isInteger(eh) || eh < 1 || eh > 24;
+  if (startInvalid && endInvalid) {
+    Logger.warn(`Invalid hour range start=${sh}, end=${eh}; resetting to defaults 6/22`);
+    config.time_grid_start_hour = DEFAULT_CONFIG.time_grid_start_hour;
+    config.time_grid_end_hour = DEFAULT_CONFIG.time_grid_end_hour;
+  } else if (startInvalid) {
+    Logger.warn(
+      `Invalid time_grid_start_hour=${sh}; resetting to default ${DEFAULT_CONFIG.time_grid_start_hour}`,
+    );
+    config.time_grid_start_hour = DEFAULT_CONFIG.time_grid_start_hour;
+  } else if (endInvalid) {
+    Logger.warn(
+      `Invalid time_grid_end_hour=${eh}; resetting to default ${DEFAULT_CONFIG.time_grid_end_hour}`,
+    );
+    config.time_grid_end_hour = DEFAULT_CONFIG.time_grid_end_hour;
+  } else if (config.time_grid_start_hour >= config.time_grid_end_hour) {
+    Logger.warn(
+      `time_grid_start_hour (${config.time_grid_start_hour}) must be less than time_grid_end_hour (${config.time_grid_end_hour}); resetting both to defaults`,
+    );
+    config.time_grid_start_hour = DEFAULT_CONFIG.time_grid_start_hour;
+    config.time_grid_end_hour = DEFAULT_CONFIG.time_grid_end_hour;
+  }
+
+  if (![15, 30, 60].includes(config.time_grid_interval_minutes)) {
+    Logger.warn(
+      `Invalid time_grid_interval_minutes=${config.time_grid_interval_minutes}; resetting to ${DEFAULT_CONFIG.time_grid_interval_minutes}`,
+    );
+    config.time_grid_interval_minutes = DEFAULT_CONFIG.time_grid_interval_minutes;
+  }
+
+  if (![1, 3, 7].includes(config.time_grid_max_days)) {
+    Logger.warn(
+      `Invalid time_grid_max_days=${config.time_grid_max_days}; must be 1, 3, or 7; resetting to ${DEFAULT_CONFIG.time_grid_max_days}`,
+    );
+    config.time_grid_max_days = DEFAULT_CONFIG.time_grid_max_days;
+  }
+
+  const navDays = config.time_grid_navigation_days;
+  if (!Number.isInteger(navDays) || navDays < 1 || navDays > 365) {
+    Logger.warn(
+      `Invalid time_grid_navigation_days=${navDays}; must be integer in [1, 365]; resetting to ${DEFAULT_CONFIG.time_grid_navigation_days}`,
+    );
+    config.time_grid_navigation_days = DEFAULT_CONFIG.time_grid_navigation_days;
+  }
+
+  if (config.time_grid_max_days > config.time_grid_navigation_days) {
+    // Reach this only when nav_days < 7 (since max_days has already been
+    // clamped to {1,3,7} above). Pick the largest legal value that fits.
+    Logger.warn(
+      `time_grid_max_days (${config.time_grid_max_days}) cannot exceed time_grid_navigation_days (${config.time_grid_navigation_days}); reducing max_days`,
+    );
+    config.time_grid_max_days = (config.time_grid_navigation_days >= 3 ? 3 : 1) as 1 | 3 | 7;
+  }
+
+  const minH = config.time_grid_event_min_height_px;
+  if (!Number.isFinite(minH) || minH < 1 || minH > 200) {
+    Logger.warn(
+      `Invalid time_grid_event_min_height_px=${minH}; must be finite number in [1, 200]; resetting to ${DEFAULT_CONFIG.time_grid_event_min_height_px}`,
+    );
+    config.time_grid_event_min_height_px = DEFAULT_CONFIG.time_grid_event_min_height_px;
+  }
+
+  const opacity = config.time_grid_allday_bg_opacity;
+  if (!Number.isFinite(opacity) || opacity < 0 || opacity > 100) {
+    Logger.warn(
+      `Invalid time_grid_allday_bg_opacity=${opacity}; must be finite number in [0, 100]; resetting to ${DEFAULT_CONFIG.time_grid_allday_bg_opacity}`,
+    );
+    config.time_grid_allday_bg_opacity = DEFAULT_CONFIG.time_grid_allday_bg_opacity;
+  }
+
+  let bp3 = config.time_grid_breakpoint_three_day_px;
+  let bp7 = config.time_grid_breakpoint_seven_day_px;
+  const bp3Invalid = !Number.isFinite(bp3) || bp3 <= 0;
+  const bp7Invalid = !Number.isFinite(bp7) || bp7 <= 0;
+  if (bp3Invalid) {
+    Logger.warn(
+      `Invalid time_grid_breakpoint_three_day_px=${bp3}; must be positive number; resetting to ${DEFAULT_CONFIG.time_grid_breakpoint_three_day_px}`,
+    );
+    bp3 = DEFAULT_CONFIG.time_grid_breakpoint_three_day_px;
+    config.time_grid_breakpoint_three_day_px = bp3;
+  }
+  if (bp7Invalid) {
+    Logger.warn(
+      `Invalid time_grid_breakpoint_seven_day_px=${bp7}; must be positive number; resetting to ${DEFAULT_CONFIG.time_grid_breakpoint_seven_day_px}`,
+    );
+    bp7 = DEFAULT_CONFIG.time_grid_breakpoint_seven_day_px;
+    config.time_grid_breakpoint_seven_day_px = bp7;
+  }
+  if (bp3 >= bp7) {
+    Logger.warn(
+      `time_grid_breakpoint_three_day_px (${bp3}) must be less than time_grid_breakpoint_seven_day_px (${bp7}); swapping/resetting to defaults`,
+    );
+    config.time_grid_breakpoint_three_day_px = DEFAULT_CONFIG.time_grid_breakpoint_three_day_px;
+    config.time_grid_breakpoint_seven_day_px = DEFAULT_CONFIG.time_grid_breakpoint_seven_day_px;
+  }
+
+  if (typeof config.time_grid_show_now_line !== 'boolean') {
+    Logger.warn(
+      `Invalid time_grid_show_now_line=${config.time_grid_show_now_line}; resetting to ${DEFAULT_CONFIG.time_grid_show_now_line}`,
+    );
+    config.time_grid_show_now_line = DEFAULT_CONFIG.time_grid_show_now_line;
+  }
+
+  return config;
+}
+
+/**
  * Determine if configuration changes affect data retrieval
  */
 export function hasConfigChanged(

@@ -288,6 +288,19 @@ class CalendarCardPro extends LitElement {
       if (this.config.view === 'time-grid') {
         this._applyVisibleDays(this.offsetWidth);
       }
+      if (prevConfig?.view !== this.config.view) {
+        // When transitioning between views, reset navigation. Coming back to grid
+        // from list should not preserve a stale offset that may exceed the new
+        // _maxOffset (especially after the user changed time_grid_navigation_days
+        // while they were in list view).
+        this.viewOffsetDays = 0;
+      } else if (
+        prevConfig &&
+        prevConfig.time_grid_navigation_days !== this.config.time_grid_navigation_days
+      ) {
+        // navigation_days shrank (or grew); re-clamp so offset stays inside [0, max].
+        this._clampViewOffset();
+      }
       if (
         prevConfig?.view !== this.config.view ||
         prevConfig?.time_grid_show_now_line !== this.config.time_grid_show_now_line
@@ -469,11 +482,21 @@ class CalendarCardPro extends LitElement {
     );
     if (next !== this.visibleDays) {
       this.visibleDays = next;
+      this._clampViewOffset();
     }
   }
 
   private _maxOffset(): number {
     return Math.max(0, this.config.time_grid_navigation_days - this.visibleDays);
+  }
+
+  private _clampViewOffset(): void {
+    const max = this._maxOffset();
+    if (this.viewOffsetDays > max) {
+      this.viewOffsetDays = max;
+    } else if (this.viewOffsetDays < 0) {
+      this.viewOffsetDays = 0;
+    }
   }
 
   private _shiftDays(delta: number): void {
@@ -645,31 +668,7 @@ class CalendarCardPro extends LitElement {
 
     // Coerce invalid time-grid config to safe defaults so downstream consumers
     // (instanceId, hasConfigChanged, render dispatch) only see valid values.
-    if (mergedConfig.view !== 'list' && mergedConfig.view !== 'time-grid') {
-      Logger.warn(`Invalid view '${mergedConfig.view}', falling back to 'list'`);
-      mergedConfig.view = 'list';
-    }
-
-    const sh = mergedConfig.time_grid_start_hour;
-    const eh = mergedConfig.time_grid_end_hour;
-    if (
-      !Number.isInteger(sh) ||
-      sh < 0 ||
-      sh > 23 ||
-      !Number.isInteger(eh) ||
-      eh < 1 ||
-      eh > 24 ||
-      sh >= eh
-    ) {
-      Logger.warn(`Invalid hour range start=${sh}, end=${eh}; resetting to defaults`);
-      mergedConfig.time_grid_start_hour = 6;
-      mergedConfig.time_grid_end_hour = 22;
-    }
-
-    if (![15, 30, 60].includes(mergedConfig.time_grid_interval_minutes)) {
-      Logger.warn(`Invalid interval ${mergedConfig.time_grid_interval_minutes}; using 30`);
-      mergedConfig.time_grid_interval_minutes = 30;
-    }
+    Config.validateTimeGridConfig(mergedConfig);
 
     this.config = mergedConfig;
     this.config.entities = Config.normalizeEntities(this.config.entities);
@@ -730,12 +729,21 @@ class CalendarCardPro extends LitElement {
       this.isLoading = true;
       await this.updateComplete;
 
-      // Get event data (from cache or API) using modularized function
-      const effectiveDays =
-        this.config.view === 'time-grid' ? this.config.time_grid_navigation_days : undefined;
+      // Get event data (from cache or API) using modularized function.
+      // For grid view: (1) widen fetch range backward by 7 days so the visible
+      // window is always covered after week alignment (Bug #1, worklog 0020);
+      // (2) disable split_multiday_events globally + per-entity so the grid
+      // renderer's own midnight-aware split runs on whole timed events,
+      // avoiding the synthetic-all-day-middle-day banner artifact (Bug #4).
+      let fetchConfig = this.config;
+      let effectiveDays: number | undefined;
+      if (this.config.view === 'time-grid') {
+        fetchConfig = Grid.buildGridFetchConfig(this.config);
+        effectiveDays = Grid.computeGridFetchRange(this.config).daysToShow;
+      }
       const eventData = await EventUtils.fetchEventData(
         this.safeHass,
-        this.config,
+        fetchConfig,
         this._instanceId,
         force,
         effectiveDays,

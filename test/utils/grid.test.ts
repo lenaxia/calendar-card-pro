@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
+import { DEFAULT_CONFIG } from '../../src/config/config';
 import * as Types from '../../src/config/types';
 import {
+  GRID_FETCH_BACK_HEADROOM_DAYS,
   SLOT_HEIGHT_PX,
   buildDayWindow,
+  buildGridFetchConfig,
   chooseVisibleDays,
   clampOffset,
   computeBannerPlacement,
   computeCardSize,
   computeEventPlacement,
+  computeGridFetchRange,
   computeNowLineTop,
   computeTodayOffset,
   daysBetween,
@@ -399,6 +403,136 @@ describe('getReferenceDate', () => {
   });
 });
 
+describe('computeGridFetchRange', () => {
+  it('exposes the headroom constant as 7 days', () => {
+    expect(GRID_FETCH_BACK_HEADROOM_DAYS).toBe(7);
+  });
+
+  it('with default config (no start_date), expands fetch start by 7 days backward and adds 7 to days_to_show', () => {
+    const range = computeGridFetchRange({
+      start_date: '',
+      days_to_show: 3,
+      time_grid_navigation_days: 28,
+    });
+    expect(range.daysToShow).toBe(35);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const expected = new Date(today);
+    expected.setDate(expected.getDate() - 7);
+    const [y, m, d] = range.startDate.split('-').map(Number);
+    const parsed = new Date(y, m - 1, d);
+    expect(parsed.getTime()).toBe(expected.getTime());
+  });
+
+  it('with explicit start_date YYYY-MM-DD, shifts back 7 days from that date', () => {
+    const range = computeGridFetchRange({
+      start_date: '2026-05-13',
+      days_to_show: 3,
+      time_grid_navigation_days: 28,
+    });
+    expect(range.startDate).toBe('2026-05-06');
+    expect(range.daysToShow).toBe(35);
+  });
+
+  it('handles month boundary (start_date 2026-05-03 → 2026-04-26)', () => {
+    const range = computeGridFetchRange({
+      start_date: '2026-05-03',
+      days_to_show: 3,
+      time_grid_navigation_days: 14,
+    });
+    expect(range.startDate).toBe('2026-04-26');
+    expect(range.daysToShow).toBe(21);
+  });
+
+  it('handles year boundary (start_date 2026-01-03 → 2025-12-27)', () => {
+    const range = computeGridFetchRange({
+      start_date: '2026-01-03',
+      days_to_show: 3,
+      time_grid_navigation_days: 14,
+    });
+    expect(range.startDate).toBe('2025-12-27');
+    expect(range.daysToShow).toBe(21);
+  });
+
+  it('Bug-1 regression: Sun-open + Mon-fdow visible window is fully covered by fetched range', () => {
+    // Today is Sunday May 17 2026; first_day_of_week=monday → snapToWindow returns
+    // Mon May 11. The fetch range must include May 11..May 17 (and the user's
+    // navigation_days=28 forward range). Without backward expansion the fetch
+    // would start at May 17 and Mon..Sat have no events.
+    const range = computeGridFetchRange({
+      start_date: '2026-05-17',
+      days_to_show: 3,
+      time_grid_navigation_days: 28,
+    });
+    expect(range.startDate).toBe('2026-05-10');
+
+    const fetchStart = new Date(2026, 4, 10);
+    const visibleWindowStart = new Date(2026, 4, 11);
+    expect(visibleWindowStart.getTime()).toBeGreaterThanOrEqual(fetchStart.getTime());
+  });
+});
+
+describe('buildGridFetchConfig', () => {
+  it('overrides start_date with the backward-expanded fetch start', () => {
+    const config: Types.Config = {
+      ...DEFAULT_CONFIG,
+      start_date: '2026-05-13',
+      time_grid_navigation_days: 28,
+    };
+    const fetchConfig = buildGridFetchConfig(config);
+    expect(fetchConfig.start_date).toBe('2026-05-06');
+  });
+
+  it('forces global split_multiday_events to false (Bug-4 regression)', () => {
+    const config: Types.Config = { ...DEFAULT_CONFIG, split_multiday_events: true };
+    const fetchConfig = buildGridFetchConfig(config);
+    expect(fetchConfig.split_multiday_events).toBe(false);
+  });
+
+  it('forces per-entity split_multiday_events override to false (Bug-4 regression)', () => {
+    const config: Types.Config = {
+      ...DEFAULT_CONFIG,
+      entities: [{ entity: 'calendar.foo', split_multiday_events: true }],
+    };
+    const fetchConfig = buildGridFetchConfig(config);
+    const e = fetchConfig.entities[0];
+    expect(typeof e === 'string' ? null : e.split_multiday_events).toBe(false);
+  });
+
+  it('does not mutate per-entity overrides that did not set split_multiday_events', () => {
+    const config: Types.Config = {
+      ...DEFAULT_CONFIG,
+      entities: [{ entity: 'calendar.foo', label: 'Foo' }],
+    };
+    const fetchConfig = buildGridFetchConfig(config);
+    const e = fetchConfig.entities[0];
+    expect(typeof e === 'string' ? null : e.split_multiday_events).toBeUndefined();
+    expect(typeof e === 'string' ? null : e.label).toBe('Foo');
+  });
+
+  it('preserves string entity entries unchanged', () => {
+    const config: Types.Config = {
+      ...DEFAULT_CONFIG,
+      entities: ['calendar.bar'],
+    };
+    const fetchConfig = buildGridFetchConfig(config);
+    expect(fetchConfig.entities[0]).toBe('calendar.bar');
+  });
+
+  it('does not mutate the input config', () => {
+    const config: Types.Config = {
+      ...DEFAULT_CONFIG,
+      start_date: '2026-05-13',
+      split_multiday_events: true,
+      entities: [{ entity: 'calendar.foo', split_multiday_events: true }],
+    };
+    const original = JSON.parse(JSON.stringify(config));
+    buildGridFetchConfig(config);
+    expect(config).toEqual(original);
+  });
+});
+
 describe('isPastEvent', () => {
   it('G-isPast: timed event ending before now is past', () => {
     const now = new Date(2026, 4, 13, 12, 0);
@@ -564,6 +698,21 @@ describe('clampOffset', () => {
 
   it('clampOffset(10, 5, 21) returns 15 (within range)', () => {
     expect(clampOffset(10, 5, 21)).toBe(15);
+  });
+
+  it('Bug-2 regression: stale offset re-clamped when navigation_days shrinks', () => {
+    // User had viewOffsetDays = 9 with nav_days=10, visibleDays=1 → max = 9 (valid).
+    // Then visibleDays grows to 7 (resize wide); new max = 10-7 = 3. Clamping with
+    // delta 0 should bring offset down from 9 to 3.
+    expect(clampOffset(9, 0, 3)).toBe(3);
+  });
+
+  it('Bug-2 regression: offset already in range stays put', () => {
+    expect(clampOffset(2, 0, 3)).toBe(2);
+  });
+
+  it('Bug-2 regression: offset 21 with new max 0 (nav_days < visibleDays) clamps to 0', () => {
+    expect(clampOffset(21, 0, 0)).toBe(0);
   });
 });
 

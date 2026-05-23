@@ -586,9 +586,14 @@ export class CalendarCardProEditor extends LitElement {
   }
 
   /**
-   * Renders a warning hint when `time_grid_navigation_days` is smaller than
-   * `time_grid_max_days`, because that combination prevents the user from ever
-   * seeing the full configured grid width (FR-7.6).
+   * Renders a live warning hint when `time_grid_navigation_days` is smaller
+   * than `time_grid_max_days`. This is a UX guide shown DURING editing,
+   * before the user commits the change. Once committed, HA round-trips the
+   * config through `setConfig` → `validateTimeGridConfig`, which clamps
+   * `time_grid_max_days` down so the saved config never violates the
+   * invariant. The hint therefore only fires for the brief window between
+   * a user edit and the round-trip — that's intentional, and lets users
+   * see why their typed value will be clamped.
    * @returns Lit template for the hint, or `nothing` if values are consistent
    */
   private _renderNavigationDaysHint(): TemplateResult | typeof nothing {

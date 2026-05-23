@@ -373,6 +373,93 @@ export function getReferenceDate(config: Pick<Types.Config, 'start_date' | 'days
 }
 
 /**
+ * Backward-expansion headroom (in days) for the grid-view fetch window. The
+ * visible 7-day window can snap up to 6 days backward to align with
+ * `first_day_of_week`; we fetch 7 extra days on the back side to guarantee
+ * the visible window is always covered. (6 would suffice arithmetically; 7
+ * is a single round week and gives us a small safety margin.)
+ */
+export const GRID_FETCH_BACK_HEADROOM_DAYS = 7;
+
+/**
+ * Formats a Date as `YYYY-MM-DD` in local time. Used to build a synthetic
+ * `start_date` that `getTimeWindow` can parse.
+ */
+function toIsoLocalDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Computes the (start_date, days_to_show) override pair the time-grid view
+ * needs to pass to `fetchEventData` so the visible window — which can snap
+ * backward up to 6 days from the user's reference for week alignment — is
+ * always covered by fetched data.
+ *
+ * Returns:
+ * - `startDate`: an ISO `YYYY-MM-DD` string positioned at
+ *   `getReferenceDate(config) - GRID_FETCH_BACK_HEADROOM_DAYS`. Even if the
+ *   user explicitly set `config.start_date`, we shift the same number of
+ *   days backward; the user's intent (where the *visible* range begins) is
+ *   preserved by the renderer's `snapToWindow`, which still reads
+ *   `config.start_date` via `getReferenceDate`.
+ * - `daysToShow`: the user's `time_grid_navigation_days` plus the headroom,
+ *   so the fetch end matches what the user expects.
+ *
+ * @param config - subset of Config with start_date, days_to_show, time_grid_navigation_days
+ */
+export function computeGridFetchRange(
+  config: Pick<Types.Config, 'start_date' | 'days_to_show' | 'time_grid_navigation_days'>,
+): { startDate: string; daysToShow: number } {
+  const reference = getReferenceDate(config);
+  const expanded = new Date(reference);
+  expanded.setDate(expanded.getDate() - GRID_FETCH_BACK_HEADROOM_DAYS);
+  return {
+    startDate: toIsoLocalDate(expanded),
+    daysToShow: config.time_grid_navigation_days + GRID_FETCH_BACK_HEADROOM_DAYS,
+  };
+}
+
+/**
+ * Builds the `fetchEventData` config override the grid view needs.
+ *
+ * Two transformations:
+ *
+ * 1. `start_date` is shifted backward by `GRID_FETCH_BACK_HEADROOM_DAYS` (see
+ *    `computeGridFetchRange` for rationale).
+ * 2. `split_multiday_events` is forced to `false` at both the global level
+ *    and on every entity override. The grid view performs its own
+ *    midnight-aware splitting via `splitTimedEventByDay`; the list-view
+ *    splitter (`processMultiDayEvents` in events.ts) produces synthetic
+ *    all-day segments for the middle days of timed multi-day events that
+ *    would render in the wrong band of the grid (Bug #4 in worklog 0020).
+ *
+ * The returned config is a shallow-cloned modification — the original
+ * config is unchanged. `entities` are cloned individually only when an
+ * override actually contains `split_multiday_events`, to keep churn minimal.
+ *
+ * @param config - the user's full Config
+ * @returns a fetch-mode config; pair its `start_date` with the
+ *          `effectiveDaysToShow` computed by `computeGridFetchRange`
+ */
+export function buildGridFetchConfig(config: Types.Config): Types.Config {
+  const range = computeGridFetchRange(config);
+  const entities = config.entities.map((e) => {
+    if (typeof e === 'string') return e;
+    if (typeof e.split_multiday_events === 'undefined') return e;
+    return { ...e, split_multiday_events: false };
+  });
+  return {
+    ...config,
+    start_date: range.startDate,
+    split_multiday_events: false,
+    entities,
+  };
+}
+
+/**
  * Whether `event` is past relative to `now`. Replicates the list-view semantics
  * in render.ts: timed events compare end-time strictly after `now`; all-day
  * events apply iCal exclusive-end-adjustment (subtract one day) and compare
