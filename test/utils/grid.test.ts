@@ -9,6 +9,7 @@ import {
   computeBannerPlacement,
   computeCardSize,
   computeEventPlacement,
+  computeNowLineTop,
   computeTodayOffset,
   daysBetween,
   formatHourLabel,
@@ -657,5 +658,27 @@ describe('computeBannerPlacement', () => {
     const placement = computeBannerPlacement(eventStart, eventEnd, windowStart, 7);
     expect(placement.visible).toBe(false);
     expect(placement.numDays).toBe(0);
+  });
+});
+
+describe('computeNowLineTop', () => {
+  it('G-2.10: 14:30 with 06:00-22:00 grid, slot=24, interval=30 returns 408', () => {
+    expect(computeNowLineTop(870, 360, 1320, 24, 30)).toBe(408);
+  });
+
+  it('G-2.10b: 23:30 outside 06:00-22:00 grid returns null', () => {
+    expect(computeNowLineTop(1410, 360, 1320, 24, 30)).toBeNull();
+  });
+
+  it('exact gridStartMin: 06:00 returns 0', () => {
+    expect(computeNowLineTop(360, 360, 1320, 24, 30)).toBe(0);
+  });
+
+  it('exactly at gridEndMin: 22:00 returns null (>= upper bound)', () => {
+    expect(computeNowLineTop(1320, 360, 1320, 24, 30)).toBeNull();
+  });
+
+  it('before gridStartMin: 05:30 returns null', () => {
+    expect(computeNowLineTop(330, 360, 1320, 24, 30)).toBeNull();
   });
 });

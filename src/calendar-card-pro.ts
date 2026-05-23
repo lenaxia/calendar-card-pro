@@ -114,6 +114,13 @@ class CalendarCardPro extends LitElement {
   private _resizeObserver?: ResizeObserver;
   private _resizeRafId?: number;
 
+  private _nowLineIntervalId?: number;
+  private _lastRenderDay: number = (() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  })();
+
   // Interaction state
   private _activePointerId: number | null = null;
   private _holdTriggered = false;
@@ -191,6 +198,9 @@ class CalendarCardPro extends LitElement {
     if (this.config.view === 'time-grid') {
       this._applyVisibleDays(this.offsetWidth);
     }
+    if (this.config.view === 'time-grid' && this.config.time_grid_show_now_line) {
+      this._startNowLine();
+    }
   }
 
   disconnectedCallback() {
@@ -236,7 +246,15 @@ class CalendarCardPro extends LitElement {
       this._resizeRafId = undefined;
     }
 
+    this._stopNowLine();
+
     Logger.debug('Component disconnected');
+  }
+
+  firstUpdated() {
+    if (this.config.view === 'time-grid' && this.config.time_grid_show_now_line) {
+      this._updateNowLinePosition();
+    }
   }
 
   updated(changedProps: PropertyValues) {
@@ -269,6 +287,15 @@ class CalendarCardPro extends LitElement {
       this._syncObserver();
       if (this.config.view === 'time-grid') {
         this._applyVisibleDays(this.offsetWidth);
+      }
+      if (
+        prevConfig?.view !== this.config.view ||
+        prevConfig?.time_grid_show_now_line !== this.config.time_grid_show_now_line
+      ) {
+        this._stopNowLine();
+        if (this.config.view === 'time-grid' && this.config.time_grid_show_now_line) {
+          this._startNowLine();
+        }
       }
     }
   }
@@ -455,6 +482,43 @@ class CalendarCardPro extends LitElement {
       this.visibleDays,
       this.config.time_grid_navigation_days,
     );
+  }
+
+  private _startNowLine(): void {
+    if (this._nowLineIntervalId !== undefined) return;
+    this._updateNowLinePosition();
+    this._nowLineIntervalId = window.setInterval(() => this._updateNowLinePosition(), 60_000);
+  }
+
+  private _stopNowLine(): void {
+    if (this._nowLineIntervalId !== undefined) {
+      clearInterval(this._nowLineIntervalId);
+      this._nowLineIntervalId = undefined;
+    }
+  }
+
+  private _updateNowLinePosition(): void {
+    const lineEl = this.renderRoot.querySelector<HTMLElement>(
+      '.ccp-grid-day-column.today .ccp-grid-now-line',
+    );
+    if (!lineEl) return;
+
+    const now = new Date();
+    const minutes = now.getHours() * 60 + now.getMinutes();
+    const top = Grid.computeNowLineTop(
+      minutes,
+      this.config.time_grid_start_hour * 60,
+      this.config.time_grid_end_hour * 60,
+      Grid.SLOT_HEIGHT_PX,
+      this.config.time_grid_interval_minutes,
+    );
+
+    if (top === null) {
+      lineEl.style.display = 'none';
+      return;
+    }
+    lineEl.style.display = '';
+    lineEl.style.top = `${top}px`;
   }
 
   /**

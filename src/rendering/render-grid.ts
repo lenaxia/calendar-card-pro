@@ -221,6 +221,9 @@ export function renderTimeGrid(
           ${days.map(
             (_day, i) => html`
               <div class="ccp-grid-day-column ${classMap({ today: i === todayIdx })}">
+                ${i === todayIdx && config.time_grid_show_now_line
+                  ? html`<div class="ccp-grid-now-line"></div>`
+                  : nothing}
                 ${eventsByDay[i].map((seg) => renderEventBlock(seg, config, use24h, ctx.now))}
               </div>
             `,

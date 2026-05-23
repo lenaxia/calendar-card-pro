@@ -517,6 +517,28 @@ export function computeTodayOffset(
   return Math.max(0, Math.min(max, diffDays));
 }
 
+/**
+ * Pixel offset (top) for the current-time line within today's day column.
+ * Returns null when `now` is outside the visible hour band, signaling the
+ * caller to hide the line.
+ *
+ * @param minutesNow - current time, minutes from local midnight
+ * @param gridStartMin - grid top edge, minutes from local midnight
+ * @param gridEndMin - grid bottom edge, minutes from local midnight
+ * @param slotHeightPx - pixels per `intervalMin`
+ * @param intervalMin - minutes per slot (typically 30)
+ */
+export function computeNowLineTop(
+  minutesNow: number,
+  gridStartMin: number,
+  gridEndMin: number,
+  slotHeightPx: number,
+  intervalMin: number,
+): number | null {
+  if (minutesNow < gridStartMin || minutesNow >= gridEndMin) return null;
+  return ((minutesNow - gridStartMin) / intervalMin) * slotHeightPx;
+}
+
 //-----------------------------------------------------------------------------
 // INTERNAL HELPERS
 //-----------------------------------------------------------------------------

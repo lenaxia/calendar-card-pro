@@ -819,6 +819,16 @@ export const cardStyles = css`
     background: color-mix(in srgb, var(--calendar-card-line-color-vertical) 4%, transparent);
   }
 
+  .ccp-grid-now-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--calendar-card-grid-now-line-color, var(--calendar-card-line-color-vertical));
+    pointer-events: none;
+    z-index: 1;
+  }
+
   .ccp-grid-event {
     position: absolute;
     border-inline-start: 2px solid var(--calendar-card-line-color-vertical);
