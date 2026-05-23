@@ -811,6 +811,9 @@ export const cardStyles = css`
 
   .ccp-grid-day-column {
     position: relative;
+    /* Must match SLOT_HEIGHT_PX in src/utils/grid.ts. A CSS-variable bridge
+       was deliberately rejected by the design — see AGENTS.md "Key Design
+       Decisions". Update both sites together if changing. */
     min-height: 24px;
     border-inline-start: 1px solid var(--calendar-card-day-separator-color, transparent);
   }

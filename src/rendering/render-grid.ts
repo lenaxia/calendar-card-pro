@@ -8,6 +8,7 @@
 
 import { TemplateResult, html, nothing } from 'lit';
 import { classMap } from 'lit/directives/class-map.js';
+import { repeat } from 'lit/directives/repeat.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
 import * as Types from '../config/types';
@@ -244,9 +245,11 @@ function renderTimeGridUnsafe(
       </div>
       <div class="ccp-grid-headers" style=${styleMap({ gridTemplateColumns: gridColumns })}>
         <div class="ccp-grid-axis-spacer"></div>
-        ${days.map(
+        ${repeat(
+          days,
+          (day) => day.getTime(),
           (day, i) => html`
-            <div class="ccp-grid-day-header ${classMap({ today: i === todayIdx })}">
+            <div class=${classMap({ 'ccp-grid-day-header': true, today: i === todayIdx })}>
               <span class="ccp-grid-day-header-weekday">${formatWeekday(day, language)}</span>
               <span class="ccp-grid-day-header-daynum">${day.getDate()}</span>
               ${isFirstOfMonth(day)
@@ -273,9 +276,11 @@ function renderTimeGridUnsafe(
           class="ccp-grid-columns"
           style=${styleMap({ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` })}
         >
-          ${days.map(
+          ${repeat(
+            days,
+            (day) => day.getTime(),
             (_day, i) => html`
-              <div class="ccp-grid-day-column ${classMap({ today: i === todayIdx })}">
+              <div class=${classMap({ 'ccp-grid-day-column': true, today: i === todayIdx })}>
                 ${eventsByDay.hiddenCounts[i] > 0
                   ? html`<div
                       class="ccp-grid-hidden-pill"
@@ -389,11 +394,12 @@ function renderEventBlock(
 
   return html`
     <div
-      class="ccp-grid-event ${classMap({
+      class=${classMap({
+        'ccp-grid-event': true,
         'past-event': isPast,
         'clipped-top': placement.clippedTop,
         'clipped-bottom': placement.clippedBottom,
-      })}"
+      })}
       style=${styleMap({
         top: `${placement.topPx}px`,
         height: `${placement.heightPx}px`,
@@ -477,7 +483,7 @@ function renderAllDayBanner(banner: AllDayBanner, config: Types.Config, now: Dat
 
   return html`
     <div
-      class="ccp-grid-allday-banner ${classMap({ 'past-event': isPast })}"
+      class=${classMap({ 'ccp-grid-allday-banner': true, 'past-event': isPast })}
       style=${styleMap({
         gridColumnStart: String(placement.dayIdx + 2),
         gridColumnEnd: `span ${placement.numDays}`,

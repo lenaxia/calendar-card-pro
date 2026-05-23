@@ -16,6 +16,26 @@ import * as Types from '../config/types';
 
 /** Vertical pixels per 30-minute slot in the time-grid view. */
 export const SLOT_HEIGHT_PX = 24;
+// NOTE: keep `min-height` of `.ccp-grid-day-column` in src/rendering/styles.ts
+// in sync with this constant. (Kept as separate values per the design's
+// rejection of a CSS variable bridge — see AGENTS.md "Key Design Decisions".)
+
+/**
+ * Approximate fixed-height "chrome" of the time-grid view (everything that is
+ * not the scrollable hour band): the navigation bar (day/window arrows + range
+ * label) and the day-headers row. Used by `computeCardSize` to translate a
+ * pixel-based grid height into HA's 50px-row units.
+ *
+ * These match the heights set in `src/rendering/styles.ts`:
+ * - `.ccp-grid-nav` ≈ 40px
+ * - `.ccp-grid-headers` ≈ 40px
+ *
+ * The all-day banners row is intentionally not reserved — it is variable and
+ * its presence is data-driven.
+ */
+export const NAV_BAR_PX = 40;
+export const DAY_HEADER_PX = 40;
+export const ALLDAY_RESERVE_PX = 0;
 
 //-----------------------------------------------------------------------------
 // PLACEMENT / LAYOUT TYPES
@@ -397,6 +417,14 @@ export function layoutOverlaps<T extends OverlapInput>(events: T[]): LayoutResul
  * replacing only `start` and `end`. Zero-duration segments (e.g. an event ending
  * exactly at midnight produces no second-day segment) are dropped.
  *
+ * Shared-reference safety: `_matchedConfig` (and other reference fields) are
+ * shared between segments and the original event. This is safe by current
+ * invariant — `_matchedConfig` is assigned exactly once during processing in
+ * `events.ts:637` (`event._matchedConfig = …`) and is read-only thereafter
+ * (downstream call sites only read `event._matchedConfig.<field>`; verified
+ * via `grep -n "_matchedConfig" src/`). If a future change introduces a
+ * post-fetch mutation of `_matchedConfig`, switch to a deep clone here.
+ *
  * @param event - timed event with start.dateTime and end.dateTime as local ISO
  * @param windowStart - inclusive local-midnight lower bound
  * @param windowEnd - exclusive local-midnight upper bound
@@ -616,7 +644,7 @@ export function computeCardSize(
   const slotsPerHour = 60 / config.time_grid_interval_minutes;
   const gridPx =
     (config.time_grid_end_hour - config.time_grid_start_hour) * slotsPerHour * SLOT_HEIGHT_PX;
-  const chromePx = 80;
+  const chromePx = NAV_BAR_PX + DAY_HEADER_PX + ALLDAY_RESERVE_PX;
   let totalPx = gridPx + chromePx;
 
   const mh = config.max_height;
