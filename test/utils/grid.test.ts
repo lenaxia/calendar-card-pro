@@ -6,6 +6,7 @@ import {
   buildDayWindow,
   chooseVisibleDays,
   clampOffset,
+  computeBannerPlacement,
   computeCardSize,
   computeEventPlacement,
   computeTodayOffset,
@@ -592,5 +593,69 @@ describe('computeTodayOffset', () => {
     const reference = new Date(2026, 4, 1);
     const today = new Date(2026, 4, 30);
     expect(computeTodayOffset(reference, today, 1, 14)).toBe(13);
+  });
+});
+
+describe('computeBannerPlacement', () => {
+  const windowStart = new Date(2026, 4, 11);
+
+  it('G-2.7a: places a banner fully inside the window with no overflow flags', () => {
+    const eventStart = new Date(2026, 4, 13);
+    const eventEnd = new Date(2026, 4, 16);
+    const placement = computeBannerPlacement(eventStart, eventEnd, windowStart, 7);
+    expect(placement).toEqual({
+      dayIdx: 2,
+      numDays: 4,
+      startedBefore: false,
+      continuesAfter: false,
+      visible: true,
+    });
+  });
+
+  it('G-2.7b: clamps a banner that started before the window and sets startedBefore', () => {
+    const eventStart = new Date(2026, 4, 9);
+    const eventEnd = new Date(2026, 4, 13);
+    const placement = computeBannerPlacement(eventStart, eventEnd, windowStart, 7);
+    expect(placement).toEqual({
+      dayIdx: 0,
+      numDays: 3,
+      startedBefore: true,
+      continuesAfter: false,
+      visible: true,
+    });
+  });
+
+  it('G-2.7c: clamps a banner that continues after the window and sets continuesAfter', () => {
+    const eventStart = new Date(2026, 4, 16);
+    const eventEnd = new Date(2026, 4, 20);
+    const placement = computeBannerPlacement(eventStart, eventEnd, windowStart, 7);
+    expect(placement).toEqual({
+      dayIdx: 5,
+      numDays: 2,
+      startedBefore: false,
+      continuesAfter: true,
+      visible: true,
+    });
+  });
+
+  it('G-2.7d: spans the entire window and sets both overflow flags', () => {
+    const eventStart = new Date(2026, 4, 9);
+    const eventEnd = new Date(2026, 4, 20);
+    const placement = computeBannerPlacement(eventStart, eventEnd, windowStart, 7);
+    expect(placement).toEqual({
+      dayIdx: 0,
+      numDays: 7,
+      startedBefore: true,
+      continuesAfter: true,
+      visible: true,
+    });
+  });
+
+  it('returns visible=false when the event lies entirely outside the window', () => {
+    const eventStart = new Date(2026, 4, 1);
+    const eventEnd = new Date(2026, 4, 5);
+    const placement = computeBannerPlacement(eventStart, eventEnd, windowStart, 7);
+    expect(placement.visible).toBe(false);
+    expect(placement.numDays).toBe(0);
   });
 });

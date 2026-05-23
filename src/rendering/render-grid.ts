@@ -49,6 +49,13 @@ interface PlacedSegment {
 
 type LaidOutSegment = Grid.LayoutResult<PlacedSegment>;
 
+interface AllDayBanner {
+  event: Types.CalendarEventData;
+  placement: Grid.BannerPlacement;
+  span: number;
+  startMs: number;
+}
+
 //-----------------------------------------------------------------------------
 // CONSTANTS
 //-----------------------------------------------------------------------------
@@ -106,6 +113,8 @@ export function renderTimeGrid(
     intervalMin,
     minHeightPx,
   });
+
+  const allDayBanners = buildAllDayBanners(events, windowStart, ctx.visibleDays);
 
   const hourLabels = buildHourLabels(config.time_grid_start_hour, config.time_grid_end_hour);
   const headerColumns = buildGridTemplateColumns(days.length);
@@ -192,7 +201,13 @@ export function renderTimeGrid(
           `,
         )}
       </div>
-      ${nothing}
+      ${allDayBanners.length === 0
+        ? nothing
+        : html`
+            <div class="ccp-grid-allday" style=${styleMap({ gridTemplateColumns: headerColumns })}>
+              ${allDayBanners.map((banner) => renderAllDayBanner(banner, config, ctx.now))}
+            </div>
+          `}
       <div class="ccp-grid-body" style=${styleMap({ gridTemplateColumns: bodyColumns })}>
         <div class="ccp-grid-time-axis">
           ${hourLabels.map(
@@ -350,6 +365,69 @@ function renderEventBlock(
       ${placement.heightPx >= LOCATION_VISIBLE_HEIGHT_PX && showLocation && event.location
         ? html`<div class="ccp-grid-event-location">${event.location}</div>`
         : nothing}
+    </div>
+  `;
+}
+
+//-----------------------------------------------------------------------------
+// ALL-DAY BANNERS
+//-----------------------------------------------------------------------------
+
+function buildAllDayBanners(
+  events: ReadonlyArray<Types.CalendarEventData>,
+  windowStart: Date,
+  visibleDays: 1 | 3 | 7,
+): AllDayBanner[] {
+  const banners: AllDayBanner[] = [];
+  for (const event of events) {
+    if (event.start.dateTime || !event.start.date || !event.end?.date) continue;
+
+    const eventStartDay = FormatUtils.parseAllDayDate(event.start.date);
+    const eventEndDay = FormatUtils.parseAllDayDate(event.end.date);
+    eventEndDay.setDate(eventEndDay.getDate() - 1);
+
+    const placement = Grid.computeBannerPlacement(
+      eventStartDay,
+      eventEndDay,
+      windowStart,
+      visibleDays,
+    );
+    if (!placement.visible) continue;
+
+    banners.push({
+      event,
+      placement,
+      span: Grid.daysBetween(eventStartDay, eventEndDay) + 1,
+      startMs: eventStartDay.getTime(),
+    });
+  }
+
+  banners.sort((a, b) => a.startMs - b.startMs || b.span - a.span);
+  return banners;
+}
+
+function renderAllDayBanner(banner: AllDayBanner, config: Types.Config, now: Date): TemplateResult {
+  const { event, placement } = banner;
+  const accentBg = EventUtils.getEntityAccentColorWithOpacity(
+    event._entityId,
+    config,
+    config.time_grid_allday_bg_opacity,
+    event,
+  );
+  const isPast = Grid.isPastEvent(event, now);
+
+  return html`
+    <div
+      class="ccp-grid-allday-banner ${classMap({ 'past-event': isPast })}"
+      style=${styleMap({
+        gridColumnStart: String(placement.dayIdx + 2),
+        gridColumnEnd: `span ${placement.numDays}`,
+        backgroundColor: accentBg,
+      })}
+    >
+      ${placement.startedBefore ? html`<span class="ccp-grid-allday-overflow">◂</span>` : nothing}
+      <span class="ccp-grid-allday-title">${event.summary ?? ''}</span>
+      ${placement.continuesAfter ? html`<span class="ccp-grid-allday-overflow">▸</span>` : nothing}
     </div>
   `;
 }

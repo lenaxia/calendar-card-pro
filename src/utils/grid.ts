@@ -443,6 +443,63 @@ export function computeCardSize(
 }
 
 /**
+ * Result of placing an all-day banner inside a visible window.
+ * - `dayIdx` is the 0-based column where the banner starts (clamped to 0 when
+ *   the event begins before the window).
+ * - `numDays` is the number of visible columns the banner occupies after
+ *   clamping; 0 when the event has no overlap with the window.
+ * - `startedBefore` / `continuesAfter` indicate the event extends past the
+ *   visible window on the corresponding side and drive the ◂ / ▸ overflow
+ *   indicators.
+ * - `visible` is `false` when the event has no overlap with the window or is
+ *   malformed (`numDays <= 0`); callers may skip rendering in that case.
+ */
+export interface BannerPlacement {
+  dayIdx: number;
+  numDays: number;
+  startedBefore: boolean;
+  continuesAfter: boolean;
+  visible: boolean;
+}
+
+/**
+ * Computes the column placement of an all-day banner inside a visible window.
+ *
+ * Caller responsibilities:
+ * - Both `eventStartDay` and `eventEndDay` must be at local midnight (use
+ *   `parseAllDayDate`).
+ * - `eventEndDay` must be the **inclusive** last day of the event; the iCal
+ *   exclusive-end adjustment (`setDate(getDate() - 1)`) is the caller's job.
+ * - `windowStart` is the local-midnight first visible column.
+ *
+ * @param eventStartDay - inclusive first day of the event, local midnight
+ * @param eventEndDay - inclusive last day of the event, local midnight
+ * @param windowStart - inclusive first visible day, local midnight
+ * @param visibleDays - number of visible columns (1, 3, or 7)
+ */
+export function computeBannerPlacement(
+  eventStartDay: Date,
+  eventEndDay: Date,
+  windowStart: Date,
+  visibleDays: 1 | 3 | 7,
+): BannerPlacement {
+  const rawDayIdx = daysBetween(windowStart, eventStartDay);
+  const dayIdx = Math.max(0, rawDayIdx);
+  const clampOffset = Math.max(0, -rawDayIdx);
+  const originalSpan = daysBetween(eventStartDay, eventEndDay) + 1;
+  const numDays = Math.min(originalSpan - clampOffset, visibleDays - dayIdx);
+
+  if (numDays <= 0) {
+    return { dayIdx: 0, numDays: 0, startedBefore: false, continuesAfter: false, visible: false };
+  }
+
+  const startedBefore = clampOffset > 0;
+  const continuesAfter = originalSpan - clampOffset > visibleDays - dayIdx;
+
+  return { dayIdx, numDays, startedBefore, continuesAfter, visible: true };
+}
+
+/**
  * Compute the offset (in days from the fetch reference) needed to bring today
  * into the navigable range. Used by the host's onResetToToday handler so
  * clicking "Today" works even when start_date moves the reference away from

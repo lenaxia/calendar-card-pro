@@ -144,6 +144,7 @@ export const DEFAULT_CONFIG: Types.Config = {
   time_grid_breakpoint_three_day_px: 500,
   time_grid_breakpoint_seven_day_px: 900,
   time_grid_navigation_days: 28,
+  time_grid_allday_bg_opacity: 20,
 
   // Actions
   tap_action: { action: 'none' },

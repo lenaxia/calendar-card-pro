@@ -866,4 +866,25 @@ export const cardStyles = css`
     opacity: 0.7;
     text-align: center;
   }
+
+  .ccp-grid-allday-banner {
+    border-radius: var(--calendar-card-grid-event-radius, 4px);
+    padding: 2px 6px;
+    margin: 1px;
+    border-inline-start: 2px solid var(--calendar-card-line-color-vertical);
+    color: var(--calendar-card-color-event);
+    font-size: var(--calendar-card-font-size-event);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .ccp-grid-allday-banner.past-event {
+    opacity: 0.55;
+  }
+
+  .ccp-grid-allday-overflow {
+    opacity: 0.6;
+    margin: 0 4px;
+  }
 `;

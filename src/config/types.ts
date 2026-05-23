@@ -130,6 +130,12 @@ export interface Config {
   time_grid_breakpoint_seven_day_px: number;
   /** Total number of days fetched and navigable in the time-grid view. The user can shift the visible window forward/backward within this range. */
   time_grid_navigation_days: number;
+  /**
+   * Background opacity for all-day banner rows in the time-grid view.
+   * Scale: 0..100 (matches existing event_background_opacity convention;
+   * see helpers.ts:convertToRGBA which divides by 100 internally). Default 20.
+   */
+  time_grid_allday_bg_opacity: number;
 
   // Actions
   tap_action: ActionConfig;
