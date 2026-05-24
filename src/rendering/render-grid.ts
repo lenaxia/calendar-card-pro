@@ -209,15 +209,17 @@ function renderTimeGridUnsafe(
   return html`
     <div class="ccp-grid">
       <div class="ccp-grid-nav">
-        <button
-          class="ccp-grid-prev-window"
-          aria-label=${prevWindowLabel}
-          ?disabled=${backDisabled}
-          @click=${navClick(() => ctx.onShiftWindow(-1))}
-          @pointerdown=${navPointerDown}
-        >
-          «
-        </button>
+        ${ctx.visibleDays !== 1
+          ? html`<button
+              class="ccp-grid-prev-window"
+              aria-label=${prevWindowLabel}
+              ?disabled=${backDisabled}
+              @click=${navClick(() => ctx.onShiftWindow(-1))}
+              @pointerdown=${navPointerDown}
+            >
+              «
+            </button>`
+          : nothing}
         ${ctx.visibleDays !== 7
           ? html`<button
               class="ccp-grid-prev-day"
@@ -248,15 +250,17 @@ function renderTimeGridUnsafe(
               ›
             </button>`
           : nothing}
-        <button
-          class="ccp-grid-next-window"
-          aria-label=${nextWindowLabel}
-          ?disabled=${forwardDisabled}
-          @click=${navClick(() => ctx.onShiftWindow(1))}
-          @pointerdown=${navPointerDown}
-        >
-          »
-        </button>
+        ${ctx.visibleDays !== 1
+          ? html`<button
+              class="ccp-grid-next-window"
+              aria-label=${nextWindowLabel}
+              ?disabled=${forwardDisabled}
+              @click=${navClick(() => ctx.onShiftWindow(1))}
+              @pointerdown=${navPointerDown}
+            >
+              »
+            </button>`
+          : nothing}
         <span class="ccp-grid-month-label">${formatMonthYear(days, language)}</span>
       </div>
       <div class="ccp-grid-headers" style=${styleMap({ gridTemplateColumns: gridColumns })}>

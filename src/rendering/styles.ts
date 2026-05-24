@@ -1103,7 +1103,11 @@ export const cardStyles = css`
     cursor: pointer;
     color: var(--secondary-text-color);
     font-size: 14px;
-    padding: 2px 6px;
+    width: 28px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
     line-height: 1;
   }
