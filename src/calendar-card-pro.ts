@@ -23,7 +23,7 @@
  */
 
 // Import Lit libraries
-import { LitElement, PropertyValues, TemplateResult } from 'lit';
+import { LitElement, PropertyValues, TemplateResult, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 // Import all types via namespace for cleaner imports
@@ -93,6 +93,14 @@ class CalendarCardPro extends LitElement {
     daily: {},
     hourly: {},
   };
+  @property({ attribute: false }) private _eventDetail: {
+    summary: string;
+    dtstart: string;
+    dtend: string;
+    location: string;
+    description: string;
+    entityId: string;
+  } | null = null;
 
   /**
    * Static method that returns a new instance of the editor
@@ -203,6 +211,14 @@ class CalendarCardPro extends LitElement {
 
     // Set up visibility listener
     document.addEventListener('visibilitychange', this._handleVisibilityChange);
+
+    // Listen for grid event detail requests
+    this.addEventListener(
+      'ccp-show-event-detail',
+      ((e: CustomEvent) => {
+        this._eventDetail = e.detail;
+      }) as EventListener,
+    );
 
     // Time-grid controllers (_responsiveColumns, _nowLine) self-register via
     // hostConnected — no explicit setup needed here.
@@ -723,6 +739,61 @@ class CalendarCardPro extends LitElement {
       content = Render.renderCardContent('error', this.effectiveLanguage);
     } else {
       content = this._renderView(this.config.view);
+    }
+
+    // Append event detail overlay if active
+    if (this._eventDetail) {
+      const d = this._eventDetail;
+      const startStr = d.dtstart
+        ? new Date(d.dtstart).toLocaleString(undefined, {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+          })
+        : '';
+      const endStr = d.dtend
+        ? new Date(d.dtend).toLocaleString(undefined, {
+            hour: 'numeric',
+            minute: '2-digit',
+          })
+        : '';
+      const close = () => {
+        this._eventDetail = null;
+      };
+      content = html`${content}
+        <div
+          class="ccp-event-overlay"
+          @click=${close}
+          @pointerdown=${(e: Event) => e.stopPropagation()}
+        >
+          <div class="ccp-event-detail" @click=${(e: Event) => e.stopPropagation()}>
+            <div class="ccp-event-detail-header">
+              <span class="ccp-event-detail-title">${d.summary}</span>
+              <button class="ccp-event-detail-close" @click=${close}>✕</button>
+            </div>
+            ${startStr
+              ? html`<div class="ccp-event-detail-row">
+                  <ha-icon icon="mdi:clock-outline"></ha-icon>
+                  <span>${startStr}${endStr ? ` – ${endStr}` : ''}</span>
+                </div>`
+              : ''}
+            ${d.location
+              ? html`<div class="ccp-event-detail-row">
+                  <ha-icon icon="mdi:map-marker-outline"></ha-icon>
+                  <span>${d.location}</span>
+                </div>`
+              : ''}
+            ${d.description
+              ? html`<div class="ccp-event-detail-row ccp-event-detail-desc">
+                  <ha-icon icon="mdi:information-outline"></ha-icon>
+                  <span>${d.description}</span>
+                </div>`
+              : ''}
+          </div>
+        </div>
+      `;
     }
 
     // Render main card structure with content

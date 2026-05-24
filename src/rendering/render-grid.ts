@@ -431,30 +431,18 @@ function renderEventBlock(
       @click=${(e: Event) => {
         e.stopPropagation();
         const el = e.currentTarget as HTMLElement;
-        const dtstart = event.start.dateTime ?? event.start.date ?? '';
-        const dtend = event.end.dateTime ?? event.end.date ?? '';
-        // Try HA's built-in calendar event detail dialog
+        // Fire a custom event that the host component handles to show detail overlay
         el.dispatchEvent(
-          new CustomEvent('show-dialog', {
+          new CustomEvent('ccp-show-event-detail', {
             bubbles: true,
             composed: true,
             detail: {
-              dialogTag: 'dialog-calendar-event-detail',
-              dialogImport: () =>
-                customElements.whenDefined('dialog-calendar-event-detail'),
-              dialogParams: {
-                calendarId: event._entityId ?? '',
-                entry: {
-                  summary: event.summary ?? '',
-                  dtstart,
-                  dtend,
-                  description: event.description ?? '',
-                  location: event.location ?? '',
-                },
-                canDelete: false,
-                canEdit: false,
-                updated: () => {},
-              },
+              summary: event.summary ?? '',
+              dtstart: event.start.dateTime ?? event.start.date ?? '',
+              dtend: event.end.dateTime ?? event.end.date ?? '',
+              location: event.location ?? '',
+              description: event.description ?? '',
+              entityId: event._entityId ?? '',
             },
           }),
         );

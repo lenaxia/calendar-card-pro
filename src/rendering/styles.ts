@@ -1017,4 +1017,74 @@ export const cardStyles = css`
     opacity: 0.6;
     margin: 0 4px;
   }
+
+  /* ===== Event detail overlay ===== */
+  .ccp-event-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .ccp-event-detail {
+    background: var(--card-background-color, var(--ha-card-background, #fff));
+    border-radius: var(--ha-card-border-radius, 12px);
+    padding: 16px;
+    max-width: 320px;
+    width: 100%;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    max-height: 80%;
+    overflow-y: auto;
+  }
+
+  .ccp-event-detail-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .ccp-event-detail-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--primary-text-color);
+    line-height: 1.3;
+    flex: 1;
+    margin-right: 8px;
+  }
+
+  .ccp-event-detail-close {
+    background: transparent;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    color: var(--secondary-text-color);
+    padding: 0 4px;
+    line-height: 1;
+  }
+
+  .ccp-event-detail-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: var(--primary-text-color);
+  }
+
+  .ccp-event-detail-row ha-icon {
+    --mdc-icon-size: 18px;
+    color: var(--secondary-text-color);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .ccp-event-detail-desc span {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
 `;
