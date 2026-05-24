@@ -23,21 +23,26 @@
  */
 
 // Import Lit libraries
-import { LitElement, PropertyValues, TemplateResult } from 'lit';
+import { LitElement, PropertyValues, TemplateResult, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 // Import all types via namespace for cleaner imports
 import * as Config from './config/config';
 import * as Constants from './config/constants';
 import * as Types from './config/types';
+import { NowLineController } from './controllers/now-line-controller';
+import { ResponsiveColumnsController } from './controllers/responsive-columns-controller';
 import * as Localize from './translations/localize';
 import * as EventUtils from './utils/events';
 import * as Actions from './interaction/actions';
+import * as FormatUtils from './utils/format';
+import * as Grid from './utils/grid';
 import * as Helpers from './utils/helpers';
 import * as Logger from './utils/logger';
 import * as Styles from './rendering/styles';
 import * as Feedback from './interaction/feedback';
 import * as Render from './rendering/render';
+import * as RenderGrid from './rendering/render-grid';
 import * as Weather from './utils/weather';
 import * as Editor from './rendering/editor';
 
@@ -82,10 +87,20 @@ class CalendarCardPro extends LitElement {
   @property({ attribute: false }) isInitialLoad = true;
   @property({ attribute: false }) isLoading = false;
   @property({ attribute: false }) isExpanded = false;
+  @property({ attribute: false }) viewOffsetDays = 0;
+  @property({ attribute: false }) visibleDays: 1 | 3 | 7 = 7;
   @property({ attribute: false }) weatherForecasts: Types.WeatherForecasts = {
     daily: {},
     hourly: {},
   };
+  @property({ attribute: false }) private _eventDetail: {
+    summary: string;
+    dtstart: string;
+    dtend: string;
+    location: string;
+    description: string;
+    entityId: string;
+  } | null = null;
 
   /**
    * Static method that returns a new instance of the editor
@@ -101,11 +116,15 @@ class CalendarCardPro extends LitElement {
   private _instanceId = Helpers.generateInstanceId();
   private _language = '';
   private _refreshTimerId?: number;
+  private _gridScrolled = false;
   private _lastUpdateTime = 0;
   private _initialLoadRetryId?: number;
   private _weatherUnsubscribers: Array<() => void> = [];
   private _weatherSetupVersion = 0;
   private _weatherSetupPending = false;
+
+  private readonly _responsiveColumns: ResponsiveColumnsController;
+  private readonly _nowLine: NowLineController;
 
   // Interaction state
   private _activePointerId: number | null = null;
@@ -162,6 +181,20 @@ class CalendarCardPro extends LitElement {
     super();
     this._instanceId = Helpers.generateInstanceId();
     Logger.initializeLogger(Constants.VERSION.CURRENT);
+
+    // Time-grid view lifecycle controllers; activate only in time-grid view.
+    this._responsiveColumns = new ResponsiveColumnsController(this);
+    this._nowLine = new NowLineController(this);
+  }
+
+  /** @internal — required by ResponsiveColumnsController */
+  onVisibleDaysChanged(): void {
+    this._clampViewOffset();
+  }
+
+  /** @internal — required by NowLineController */
+  get hostElement(): Element {
+    return this;
   }
 
   connectedCallback() {
@@ -179,6 +212,12 @@ class CalendarCardPro extends LitElement {
 
     // Set up visibility listener
     document.addEventListener('visibilitychange', this._handleVisibilityChange);
+
+    // Listen for grid event detail requests
+    this.addEventListener('ccp-show-event-detail', this._handleShowEventDetail);
+
+    // Time-grid controllers (_responsiveColumns, _nowLine) self-register via
+    // hostConnected — no explicit setup needed here.
   }
 
   disconnectedCallback() {
@@ -214,6 +253,7 @@ class CalendarCardPro extends LitElement {
 
     // Remove listeners
     document.removeEventListener('visibilitychange', this._handleVisibilityChange);
+    this.removeEventListener('ccp-show-event-detail', this._handleShowEventDetail);
 
     Logger.debug('Component disconnected');
   }
@@ -243,6 +283,41 @@ class CalendarCardPro extends LitElement {
     if (hassJustAvailable || weatherConfigChanged) {
       this._scheduleWeatherSetup();
     }
+
+    if (changedProps.has('config')) {
+      // Controllers handle their own observer/interval state via hostUpdated;
+      // host only does cross-controller orchestration here.
+      if (prevConfig?.view !== this.config.view) {
+        this.viewOffsetDays = 0;
+      } else if (
+        prevConfig &&
+        prevConfig.time_grid_navigation_days !== this.config.time_grid_navigation_days
+      ) {
+        this._clampViewOffset();
+      }
+    }
+
+    // Auto-scroll grid view to current time on first render with events
+    if (
+      this.config.view === 'time-grid' &&
+      !this._gridScrolled &&
+      !this.isInitialLoad &&
+      this.events.length > 0
+    ) {
+      this._gridScrolled = true;
+      const container = this.renderRoot?.querySelector('.content-container') as HTMLElement | null;
+      if (container) {
+        const now = this._nowLine.now;
+        const nowMin = now.getHours() * 60 + now.getMinutes();
+        const gridStartMin = this.config.time_grid_start_hour * 60;
+        const gridEndMin = this.config.time_grid_end_hour * 60;
+        if (nowMin >= gridStartMin && nowMin < gridEndMin) {
+          const pxPerMin = Grid.SLOT_HEIGHT_PX / this.config.time_grid_interval_minutes;
+          const nowPx = (nowMin - gridStartMin) * pxPerMin;
+          container.scrollTop = Math.max(0, nowPx - container.clientHeight / 3);
+        }
+      }
+    }
   }
 
   //-----------------------------------------------------------------------------
@@ -259,16 +334,26 @@ class CalendarCardPro extends LitElement {
   }
 
   /**
-   * Handle visibility changes to refresh data when returning to the page
+   * Handle visibility changes to refresh data when returning to the page.
+   * The NowLine controller has its own visibilitychange listener for tick
+   * pause/resume; the host listener handles the data-refresh and the
+   * "remeasure columns after a long hide" cases.
    */
+  private _handleShowEventDetail = (e: Event) => {
+    this._eventDetail = (e as CustomEvent).detail;
+  };
+
   private _handleVisibilityChange = () => {
     if (document.visibilityState === 'visible') {
       const now = Date.now();
-      // Only refresh if it's been a while
       if (now - this._lastUpdateTime > Constants.TIMING.VISIBILITY_REFRESH_THRESHOLD) {
         Logger.debug('Visibility changed to visible, updating events');
         this.updateEvents();
       }
+      // The host may have been resized while hidden; ResizeObserver may not
+      // fire on hidden→visible if the dimensions did not actually change.
+      // Force a measurement pass so visibleDays reflects current width.
+      this._responsiveColumns.remeasure();
     }
   };
 
@@ -375,6 +460,40 @@ class CalendarCardPro extends LitElement {
       }
     });
     this._weatherUnsubscribers = [];
+  }
+
+  private _maxOffset(): number {
+    return Math.max(0, this.config.time_grid_navigation_days - this.visibleDays);
+  }
+
+  private _clampViewOffset(): void {
+    const max = this._maxOffset();
+    if (this.viewOffsetDays > max) {
+      this.viewOffsetDays = max;
+    } else if (this.viewOffsetDays < 0) {
+      this.viewOffsetDays = 0;
+    }
+  }
+
+  private _shiftDays(delta: number): void {
+    this.viewOffsetDays = Grid.clampOffset(this.viewOffsetDays, delta, this._maxOffset());
+  }
+
+  private _todayOffset(): number {
+    const reference = Grid.getReferenceDate(this.config);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const firstDayOfWeek = FormatUtils.getFirstDayOfWeek(
+      this.config.first_day_of_week,
+      this.effectiveLanguage,
+    );
+    return Grid.computeTodayOffset(
+      reference,
+      today,
+      this.visibleDays,
+      this.config.time_grid_navigation_days,
+      firstDayOfWeek,
+    );
   }
 
   /**
@@ -485,6 +604,10 @@ class CalendarCardPro extends LitElement {
     // END OF DEPRECATED PARAMETERS HANDLING
     //============================================================================
 
+    // Coerce invalid time-grid config to safe defaults so downstream consumers
+    // (instanceId, hasConfigChanged, render dispatch) only see valid values.
+    Config.validateTimeGridConfig(mergedConfig);
+
     this.config = mergedConfig;
     this.config.entities = Config.normalizeEntities(this.config.entities);
 
@@ -505,6 +628,16 @@ class CalendarCardPro extends LitElement {
 
     // Restart the timer with new config
     this.startRefreshTimer();
+  }
+
+  /**
+   * Approximate card size for Home Assistant's masonry view (in 50px-row units).
+   * List view returns 1 (HA's documented default); time-grid view returns the
+   * height of the visible band plus a small chrome allowance, optionally
+   * clamped to a px-valued `max_height`.
+   */
+  public getCardSize(): number {
+    return Grid.computeCardSize(this.config);
   }
 
   /**
@@ -534,12 +667,24 @@ class CalendarCardPro extends LitElement {
       this.isLoading = true;
       await this.updateComplete;
 
-      // Get event data (from cache or API) using modularized function
+      // Get event data (from cache or API) using modularized function.
+      // For grid view: (1) widen fetch range backward by 7 days so the visible
+      // window is always covered after week alignment (Bug #1, worklog 0020);
+      // (2) disable split_multiday_events globally + per-entity so the grid
+      // renderer's own midnight-aware split runs on whole timed events,
+      // avoiding the synthetic-all-day-middle-day banner artifact (Bug #4).
+      let fetchConfig = this.config;
+      let effectiveDays: number | undefined;
+      if (this.config.view === 'time-grid') {
+        fetchConfig = Grid.buildGridFetchConfig(this.config);
+        effectiveDays = Grid.computeGridFetchRange(this.config).daysToShow;
+      }
       const eventData = await EventUtils.fetchEventData(
         this.safeHass,
-        this.config,
+        fetchConfig,
         this._instanceId,
         force,
+        effectiveDays,
       );
 
       this.isLoading = false;
@@ -585,15 +730,26 @@ class CalendarCardPro extends LitElement {
    */
   render() {
     const customStyles = this.getCustomStyles();
+    const isGridView = this.config.view === 'time-grid';
 
     // Create event handlers object for the card
-    const handlers = {
-      keyDown: (ev: KeyboardEvent) => this._handleKeyDown(ev),
-      pointerDown: (ev: PointerEvent) => this._handlePointerDown(ev),
-      pointerUp: (ev: PointerEvent) => this._handlePointerUp(ev),
-      pointerCancel: () => this._handlePointerCancel(),
-      pointerLeave: () => this._handlePointerCancel(),
-    };
+    // Grid view has its own nav buttons; disable card-level tap/hold
+    const noop = () => {};
+    const handlers = isGridView
+      ? {
+          keyDown: noop as unknown as (ev: KeyboardEvent) => void,
+          pointerDown: noop as unknown as (ev: PointerEvent) => void,
+          pointerUp: noop as unknown as (ev: PointerEvent) => void,
+          pointerCancel: noop as unknown as (ev: Event) => void,
+          pointerLeave: noop as unknown as (ev: Event) => void,
+        }
+      : {
+          keyDown: (ev: KeyboardEvent) => this._handleKeyDown(ev),
+          pointerDown: (ev: PointerEvent) => this._handlePointerDown(ev),
+          pointerUp: (ev: PointerEvent) => this._handlePointerUp(ev),
+          pointerCancel: () => this._handlePointerCancel(),
+          pointerLeave: () => this._handlePointerCancel(),
+        };
 
     // Determine card content based on state
     let content: TemplateResult;
@@ -604,31 +760,85 @@ class CalendarCardPro extends LitElement {
     } else if (!this.safeHass || !this.config.entities.length) {
       // Error state - missing entities
       content = Render.renderCardContent('error', this.effectiveLanguage);
-    } else if (this.events.length === 0) {
-      // Even with no events, use the regular groupEventsByDay function
-      // which now handles empty API results correctly
-      const groupedEmptyDays = EventUtils.groupEventsByDay(
-        [], // Empty events array
-        this.config,
-        this.isExpanded,
-        this.effectiveLanguage,
-      );
-      content = Render.renderGroupedEvents(
-        groupedEmptyDays,
-        this.config,
-        this.effectiveLanguage,
-        this.weatherForecasts,
-        this.safeHass,
-      );
     } else {
-      // Normal state with events - use renderGroupedEvents to handle week numbers and separators
-      content = Render.renderGroupedEvents(
-        this.groupedEvents,
-        this.config,
-        this.effectiveLanguage,
-        this.weatherForecasts,
-        this.safeHass,
-      );
+      content = this._renderView(this.config.view);
+    }
+
+    // Append event detail overlay if active
+    if (this._eventDetail) {
+      const d = this._eventDetail;
+      // Decode HTML entities in description (calendar APIs often return HTML)
+      const decodeHtml = (s: string): string => {
+        const txt = document.createElement('textarea');
+        txt.innerHTML = s;
+        return txt.value;
+      };
+      const description = d.description ? decodeHtml(d.description.replace(/<[^>]*>/g, '')) : '';
+      const summary = d.summary ? decodeHtml(d.summary) : '';
+      const startStr = d.dtstart
+        ? new Date(d.dtstart).toLocaleString(undefined, {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+          })
+        : '';
+      const endStr = d.dtend
+        ? new Date(d.dtend).toLocaleString(undefined, {
+            hour: 'numeric',
+            minute: '2-digit',
+          })
+        : '';
+      const close = () => {
+        this._eventDetail = null;
+      };
+      content = html`${content}
+        <div
+          class="ccp-event-overlay"
+          @click=${close}
+          @pointerdown=${(e: Event) => e.stopPropagation()}
+        >
+          <div class="ccp-event-detail" @click=${(e: Event) => e.stopPropagation()}>
+            <div class="ccp-event-detail-header">
+              <span class="ccp-event-detail-title">${summary}</span>
+              <button class="ccp-event-detail-close" @click=${close}>✕</button>
+            </div>
+            ${startStr
+              ? html`<div class="ccp-event-detail-row">
+                  <ha-icon icon="mdi:clock-outline"></ha-icon>
+                  <span>${startStr}${endStr ? ` – ${endStr}` : ''}</span>
+                </div>`
+              : ''}
+            ${d.location
+              ? html`<div class="ccp-event-detail-row ccp-event-detail-location">
+                  <ha-icon icon="mdi:map-marker-outline"></ha-icon>
+                  <span class="ccp-event-detail-loc-text">${d.location}</span>
+                  <button
+                    class="ccp-event-detail-copy"
+                    @click=${(e: Event) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(d.location);
+                      const btn = e.currentTarget as HTMLElement;
+                      btn.textContent = '✓';
+                      setTimeout(() => {
+                        btn.textContent = '⧉';
+                      }, 1500);
+                    }}
+                    title="Copy location"
+                  >
+                    ⧉
+                  </button>
+                </div>`
+              : ''}
+            ${d.description
+              ? html`<div class="ccp-event-detail-row ccp-event-detail-desc">
+                  <ha-icon icon="mdi:information-outline"></ha-icon>
+                  <span>${description}</span>
+                </div>`
+              : ''}
+          </div>
+        </div> `;
     }
 
     // Render main card structure with content
@@ -639,6 +849,73 @@ class CalendarCardPro extends LitElement {
       handlers,
       false,
       this.isLoading,
+      isGridView,
+    );
+  }
+
+  /**
+   * Dispatch on the view discriminator. The `never` fallthrough makes adding a
+   * new variant to `Config['view']` a TypeScript compile error here, preventing
+   * silent regressions like a future `'month-grid'` falling through to the list
+   * renderer (E-3).
+   */
+  private _renderView(view: Types.Config['view']): TemplateResult {
+    switch (view) {
+      case 'list':
+        return this._renderListView();
+      case 'time-grid':
+        return this._renderTimeGridView();
+      default: {
+        const _exhaustive: never = view;
+        throw new Error(`Unhandled view variant: ${String(_exhaustive)}`);
+      }
+    }
+  }
+
+  private _renderListView(): TemplateResult {
+    if (this.events.length === 0) {
+      const groupedEmptyDays = EventUtils.groupEventsByDay(
+        [],
+        this.config,
+        this.isExpanded,
+        this.effectiveLanguage,
+      );
+      return Render.renderGroupedEvents(
+        groupedEmptyDays,
+        this.config,
+        this.effectiveLanguage,
+        this.weatherForecasts,
+        this.safeHass,
+      );
+    }
+    return Render.renderGroupedEvents(
+      this.groupedEvents,
+      this.config,
+      this.effectiveLanguage,
+      this.weatherForecasts,
+      this.safeHass,
+    );
+  }
+
+  private _renderTimeGridView(): TemplateResult {
+    return RenderGrid.renderTimeGrid(
+      this.events,
+      this.config,
+      this.effectiveLanguage,
+      {
+        visibleDays: this.visibleDays,
+        offsetDays: this.viewOffsetDays,
+        now: this._nowLine.now,
+        onShiftDay: (d) => this._shiftDays(d),
+        onShiftWindow: (d) => this._shiftDays(d * this.visibleDays),
+        onResetToToday: () => {
+          this.viewOffsetDays = this._todayOffset();
+        },
+        canShiftBack: this.viewOffsetDays > 0,
+        canShiftForward: this.viewOffsetDays < this._maxOffset(),
+      },
+      this.safeHass,
+      this.weatherForecasts,
     );
   }
 }

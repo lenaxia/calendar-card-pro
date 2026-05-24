@@ -31,12 +31,14 @@ export async function fetchEventData(
   config: Types.Config,
   instanceId: string,
   force = false,
+  effectiveDaysToShow?: number,
 ): Promise<Types.CalendarEventData[]> {
+  const daysToShow = effectiveDaysToShow ?? config.days_to_show;
   // Generate cache key based on configuration
   const cacheKey = getBaseCacheKey(
     instanceId,
     config.entities,
-    config.days_to_show,
+    daysToShow,
     config.show_past_events,
     config.start_date,
     config.filter_duplicates, // Include filter_duplicates in cache key
@@ -58,7 +60,7 @@ export async function fetchEventData(
     typeof e === 'string' ? { entity: e, color: 'var(--primary-text-color)' } : e,
   );
 
-  const timeWindow = getTimeWindow(config.days_to_show, config.start_date);
+  const timeWindow = getTimeWindow(daysToShow, config.start_date);
   const fetchedEvents = await fetchEvents(hass, entities, timeWindow);
 
   // Process events according to configuration rules
@@ -67,7 +69,7 @@ export async function fetchEventData(
   // Additional check to enforce days_to_show as a hard limit from reference date
   const referenceDate = getStartDateReference(config);
   const limitDate = new Date(referenceDate);
-  limitDate.setDate(limitDate.getDate() + config.days_to_show);
+  limitDate.setDate(limitDate.getDate() + daysToShow);
 
   // Filter events to only include those within the days_to_show range
   processedEvents = processedEvents.filter((event) => {

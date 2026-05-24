@@ -17,10 +17,13 @@
  * @returns RGBA color string
  */
 export function convertToRGBA(color: string, opacity: number): string {
-  // If color is a CSS variable, we need to handle it specially
+  // If color is a CSS variable, preserve the user's variable name and apply
+  // opacity via `color-mix`. This lets card-mod / theme variables resolve to
+  // any valid CSS color (named, hex, rgb, hsl, etc.) without us collapsing
+  // them to a hardcoded fallback. `color-mix` is supported across HA's
+  // browser baseline (Chromium 117+, Firefox 113+, Safari 16.2+).
   if (color.startsWith('var(')) {
-    // Create a temporary CSS variable with opacity
-    return `rgba(var(--calendar-color-rgb, 3, 169, 244), ${opacity / 100})`;
+    return `color-mix(in srgb, ${color} ${opacity}%, transparent)`;
   }
 
   if (color === 'transparent') {

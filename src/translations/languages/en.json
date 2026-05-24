@@ -11,6 +11,13 @@
   "loading": "Loading calendar events...",
   "error": "Error: Calendar entity not found or improperly configured",
 
+  "time_grid_today": "Today",
+  "time_grid_prev_day_aria": "Previous day",
+  "time_grid_next_day_aria": "Next day",
+  "time_grid_prev_window_aria": "Previous {n} days",
+  "time_grid_next_window_aria": "Next {n} days",
+  "time_grid_hidden_events_aria": "{n} hidden events",
+
   "editor": {
     "calendar_entities": "Calendar Entities",
     "calendar": "Calendar",
@@ -224,7 +231,7 @@
     "show_temp": "Show temperature",
     "show_uv_index": "Show UV index",
     "uv_index_threshold": "UV index threshold",
-    
+
     "interactions": "Interactions",
     "tap_action": "Tap Action",
     "hold_action": "Hold Action",
@@ -244,6 +251,31 @@
     "deprecated_config_detected": "Deprecated config options detected.",
     "deprecated_config_explanation": "Some options in your configuration are no longer supported.",
     "deprecated_config_update_hint": "Please update to ensure compatibility.",
-    "update_config": "Update config…"
+    "update_config": "Update config…",
+
+    "view": "View",
+    "view_list": "List",
+    "view_time_grid": "Time grid",
+
+    "time_grid_settings": "Time grid",
+    "time_grid_start_hour": "Start hour",
+    "time_grid_end_hour": "End hour",
+    "time_grid_interval_minutes": "Slot interval (minutes)",
+    "time_grid_interval_minutes_note": "Allowed values: 15, 30, 60",
+    "time_grid_interval_15": "15 minutes",
+    "time_grid_interval_30": "30 minutes",
+    "time_grid_interval_60": "60 minutes",
+    "time_grid_event_min_height_px": "Minimum event height (px)",
+    "time_grid_max_days": "Maximum visible days",
+    "time_grid_max_days_note": "Allowed values: 1, 3, 7",
+    "time_grid_max_1_day": "1 day",
+    "time_grid_max_3_days": "3 days",
+    "time_grid_max_7_days": "7 days",
+    "time_grid_navigation_days": "Navigation window (days)",
+    "time_grid_navigation_days_warning": "Navigation window is smaller than maximum visible days. Consider increasing it.",
+    "time_grid_breakpoint_three_day_px": "Three-day breakpoint (px)",
+    "time_grid_breakpoint_seven_day_px": "Seven-day breakpoint (px)",
+    "time_grid_show_now_line": "Show \"now\" line",
+    "time_grid_allday_bg_opacity": "All-day banner opacity (0–100)"
   }
 }
