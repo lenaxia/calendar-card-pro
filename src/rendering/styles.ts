@@ -911,7 +911,7 @@ export const cardStyles = css`
   .ccp-grid-event {
     position: absolute;
     border-inline-start: 2px solid var(--calendar-card-line-color-vertical);
-    background: var(--calendar-card-line-color-vertical);
+    background: color-mix(in srgb, var(--calendar-card-line-color-vertical) 20%, transparent);
     color: var(--calendar-card-color-event);
     border-radius: var(--calendar-card-grid-event-radius, 4px);
     font-size: var(--calendar-card-font-size-event);
@@ -1006,6 +1006,7 @@ export const cardStyles = css`
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
+    cursor: pointer;
   }
 
   .ccp-grid-allday-banner.past-event {

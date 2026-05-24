@@ -79,6 +79,24 @@ const navPointerDown = (e: Event): void => {
   e.stopPropagation();
 };
 
+let swipeStartX = 0;
+
+const swipeStart = (e: TouchEvent): void => {
+  swipeStartX = e.touches[0].clientX;
+};
+
+const buildSwipeEnd =
+  (ctx: TimeGridContext) =>
+  (e: TouchEvent): void => {
+    const dx = e.changedTouches[0].clientX - swipeStartX;
+    if (Math.abs(dx) < SWIPE_THRESHOLD_PX) return;
+    if (dx > 0 && ctx.canShiftBack) {
+      ctx.onShiftDay(-1);
+    } else if (dx < 0 && ctx.canShiftForward) {
+      ctx.onShiftDay(1);
+    }
+  };
+
 /**
  * The time-axis column width is owned by CSS (`--calendar-card-grid-time-axis-width`,
  * default 48px). The renderer references that CSS variable in its inline
@@ -90,6 +108,7 @@ const navPointerDown = (e: Event): void => {
 const TIME_AXIS_WIDTH_CSS = 'var(--calendar-card-grid-time-axis-width, 48px)';
 const TIME_VISIBLE_HEIGHT_PX = 32;
 const LOCATION_VISIBLE_HEIGHT_PX = 56;
+const SWIPE_THRESHOLD_PX = 50;
 
 //-----------------------------------------------------------------------------
 // MAIN RENDERER
@@ -292,6 +311,8 @@ function renderTimeGridUnsafe(
           '--calendar-card-grid-hour-height': `${hourHeightPx}px`,
           '--calendar-card-grid-column-height': `${columnHeightPx}px`,
         })}
+        @touchstart=${swipeStart}
+        @touchend=${buildSwipeEnd(ctx)}
       >
         <div class="ccp-grid-time-axis">
           ${hourLabels.map(
@@ -415,6 +436,19 @@ function renderEventBlock(
     config.show_location;
   const isPast = Grid.isPastEvent(event, now);
 
+  const accentColor = EventUtils.getEntityAccentColorWithOpacity(
+    event._entityId,
+    config,
+    undefined,
+    event,
+  );
+  const bgColor = EventUtils.getEntityAccentColorWithOpacity(
+    event._entityId,
+    config,
+    20,
+    event,
+  );
+
   const startDate = event.start.dateTime ? new Date(event.start.dateTime) : null;
   const endDate = event.end.dateTime ? new Date(event.end.dateTime) : null;
 
@@ -431,6 +465,8 @@ function renderEventBlock(
         height: `${placement.heightPx}px`,
         left: `${leftPct}%`,
         width: `calc(${widthPct}% - 2px)`,
+        borderInlineStartColor: accentColor,
+        backgroundColor: bgColor,
       })}
       @click=${(e: Event) => {
         e.stopPropagation();
@@ -535,6 +571,25 @@ function renderAllDayBanner(banner: AllDayBanner, config: Types.Config, now: Dat
         gridColumnEnd: `span ${placement.numDays}`,
         backgroundColor: accentBg,
       })}
+      @click=${(e: Event) => {
+        e.stopPropagation();
+        const el = e.currentTarget as HTMLElement;
+        el.dispatchEvent(
+          new CustomEvent('ccp-show-event-detail', {
+            bubbles: true,
+            composed: true,
+            detail: {
+              summary: event.summary ?? '',
+              dtstart: event.start.date ?? '',
+              dtend: event.end?.date ?? '',
+              location: event.location ?? '',
+              description: event.description ?? '',
+              entityId: event._entityId ?? '',
+            },
+          }),
+        );
+      }}
+      @pointerdown=${navPointerDown}
     >
       ${placement.startedBefore ? html`<span class="ccp-grid-allday-overflow">◂</span>` : nothing}
       <span class="ccp-grid-allday-title">${event.summary ?? ''}</span>

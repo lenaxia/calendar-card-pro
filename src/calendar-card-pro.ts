@@ -116,6 +116,7 @@ class CalendarCardPro extends LitElement {
   private _instanceId = Helpers.generateInstanceId();
   private _language = '';
   private _refreshTimerId?: number;
+  private _gridScrolled = false;
   private _lastUpdateTime = 0;
   private _initialLoadRetryId?: number;
   private _weatherUnsubscribers: Array<() => void> = [];
@@ -297,6 +298,29 @@ class CalendarCardPro extends LitElement {
         prevConfig.time_grid_navigation_days !== this.config.time_grid_navigation_days
       ) {
         this._clampViewOffset();
+      }
+    }
+
+    // Auto-scroll grid view to current time on first render with events
+    if (
+      this.config.view === 'time-grid' &&
+      !this._gridScrolled &&
+      !this.isInitialLoad &&
+      this.events.length > 0
+    ) {
+      this._gridScrolled = true;
+      const container = this.renderRoot?.querySelector('.content-container') as HTMLElement | null;
+      if (container) {
+        const now = this._nowLine.now;
+        const nowMin = now.getHours() * 60 + now.getMinutes();
+        const gridStartMin = this.config.time_grid_start_hour * 60;
+        const gridEndMin = this.config.time_grid_end_hour * 60;
+        if (nowMin >= gridStartMin && nowMin < gridEndMin) {
+          const pxPerMin =
+            (Grid.SLOT_HEIGHT_PX / this.config.time_grid_interval_minutes);
+          const nowPx = (nowMin - gridStartMin) * pxPerMin;
+          container.scrollTop = Math.max(0, nowPx - container.clientHeight / 3);
+        }
       }
     }
   }
