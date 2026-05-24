@@ -768,6 +768,14 @@ class CalendarCardPro extends LitElement {
     // Append event detail overlay if active
     if (this._eventDetail) {
       const d = this._eventDetail;
+      // Decode HTML entities in description (calendar APIs often return HTML)
+      const decodeHtml = (s: string): string => {
+        const txt = document.createElement('textarea');
+        txt.innerHTML = s;
+        return txt.value;
+      };
+      const description = d.description ? decodeHtml(d.description.replace(/<[^>]*>/g, '')) : '';
+      const summary = d.summary ? decodeHtml(d.summary) : '';
       const startStr = d.dtstart
         ? new Date(d.dtstart).toLocaleString(undefined, {
             weekday: 'short',
@@ -794,7 +802,7 @@ class CalendarCardPro extends LitElement {
         >
           <div class="ccp-event-detail" @click=${(e: Event) => e.stopPropagation()}>
             <div class="ccp-event-detail-header">
-              <span class="ccp-event-detail-title">${d.summary}</span>
+              <span class="ccp-event-detail-title">${summary}</span>
               <button class="ccp-event-detail-close" @click=${close}>✕</button>
             </div>
             ${startStr
@@ -825,7 +833,7 @@ class CalendarCardPro extends LitElement {
             ${d.description
               ? html`<div class="ccp-event-detail-row ccp-event-detail-desc">
                   <ha-icon icon="mdi:information-outline"></ha-icon>
-                  <span>${d.description}</span>
+                  <span>${description}</span>
                 </div>`
               : ''}
           </div>
