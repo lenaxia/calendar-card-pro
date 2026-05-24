@@ -1,0 +1,803 @@
+/**
+ * Pure helpers for the time-grid view of Calendar Card Pro
+ *
+ * Date math, layout/overlap math, event splitting, and label formatting.
+ * No imports from Lit, DOM, HA, or events.ts beyond the public getTimeWindow.
+ * All functions operate in the local timezone unless otherwise noted.
+ */
+
+import { getTimeWindow } from './events';
+import { parseAllDayDate } from './format';
+import * as Types from '../config/types';
+
+//-----------------------------------------------------------------------------
+// CONSTANTS
+//-----------------------------------------------------------------------------
+
+/** Vertical pixels per 30-minute slot in the time-grid view. */
+export const SLOT_HEIGHT_PX = 24;
+// NOTE: keep `min-height` of `.ccp-grid-day-column` in src/rendering/styles.ts
+// in sync with this constant. (Kept as separate values per the design's
+// rejection of a CSS variable bridge — see AGENTS.md "Key Design Decisions".)
+
+/**
+ * Approximate fixed-height "chrome" of the time-grid view (everything that is
+ * not the scrollable hour band): the navigation bar (day/window arrows + range
+ * label) and the day-headers row. Used by `computeCardSize` to translate a
+ * pixel-based grid height into HA's 50px-row units.
+ *
+ * These match the heights set in `src/rendering/styles.ts`:
+ * - `.ccp-grid-nav` ≈ 40px
+ * - `.ccp-grid-headers` ≈ 40px
+ *
+ * The all-day banners row is intentionally not reserved — it is variable and
+ * its presence is data-driven.
+ */
+export const NAV_BAR_PX = 40;
+export const DAY_HEADER_PX = 40;
+export const ALLDAY_RESERVE_PX = 0;
+
+//-----------------------------------------------------------------------------
+// PLACEMENT / LAYOUT TYPES
+//-----------------------------------------------------------------------------
+
+/**
+ * Result of placing a timed event into the grid.
+ * - `outsideRange` true when the event has no overlap with the visible hour band
+ *   (or is malformed, end <= start). Other fields are 0 in that case.
+ * - `clippedTop`/`clippedBottom` indicate the event extends past the visible band.
+ */
+export interface EventPlacement {
+  topPx: number;
+  heightPx: number;
+  clippedTop: boolean;
+  clippedBottom: boolean;
+  outsideRange: boolean;
+}
+
+/**
+ * Half-open interval used by layoutOverlaps. Caller-defined extra fields are
+ * preserved on the output via intersection.
+ */
+export interface OverlapInput {
+  startMin: number;
+  endMin: number;
+}
+
+/** Result of layoutOverlaps: original record plus assigned lane index/count. */
+export type LayoutResult<T extends OverlapInput> = T & {
+  laneIndex: number;
+  laneCount: number;
+};
+
+/**
+ * A single timed segment (already split by day boundary) ready to be placed
+ * into a column bucket. Carried by `bucketAndPlaceSegments` so the renderer
+ * can flow it through `layoutOverlaps` without re-deriving start/end minutes.
+ */
+export interface PlacedSegment {
+  event: Types.CalendarEventData;
+  startMin: number;
+  endMin: number;
+  placement: EventPlacement;
+}
+
+//-----------------------------------------------------------------------------
+// DATE / TIME HELPERS
+//-----------------------------------------------------------------------------
+
+/**
+ * Minutes elapsed since local midnight for the given Date.
+ *
+ * @param d - Local-time Date
+ * @returns integer in [0, 1440)
+ */
+export function minutesFromMidnight(d: Date): number {
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+/**
+ * Returns a new Date set to local 00:00:00.000 on the same calendar day.
+ *
+ * @param d - any local-time Date
+ * @returns Date at local midnight
+ */
+export function startOfDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+/**
+ * Whole-day difference (b - a), using local midnight normalization.
+ *
+ * @param a - earlier Date (any time)
+ * @param b - later Date (any time)
+ * @returns integer day count; can be negative if b < a
+ */
+export function daysBetween(a: Date, b: Date): number {
+  const sa = startOfDay(a).getTime();
+  const sb = startOfDay(b).getTime();
+  // Round (not floor) handles ±1h DST: spring-forward gives a 23h day; floor → 0 instead of 1.
+  return Math.round((sb - sa) / 86_400_000);
+}
+
+/**
+ * Local midnight of the week containing `d`, aligned to `firstDayOfWeek`.
+ *
+ * @param d - any local-time Date
+ * @param firstDayOfWeek - 0 (Sunday) or 1 (Monday)
+ * @returns Date at local midnight
+ */
+export function startOfWeek(d: Date, firstDayOfWeek: 0 | 1): Date {
+  const base = startOfDay(d);
+  const offset = (base.getDay() - firstDayOfWeek + 7) % 7;
+  base.setDate(base.getDate() - offset);
+  return base;
+}
+
+/**
+ * Builds an array of `dayCount` consecutive local-midnight Date entries
+ * starting at `from`.
+ *
+ * @param from - first day (will be normalized to local midnight)
+ * @param dayCount - number of days to emit
+ * @returns array of Date, each at local midnight
+ */
+export function buildDayWindow(from: Date, dayCount: number): Date[] {
+  const start = startOfDay(from);
+  const out: Date[] = [];
+  for (let i = 0; i < dayCount; i++) {
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    out.push(d);
+  }
+  return out;
+}
+
+/**
+ * Snaps a reference Date and offset to a coherent window of `dayCount`
+ * consecutive local-midnight Dates. For `dayCount === 7`, the window's start
+ * is week-aligned to `firstDayOfWeek`. For other dayCount values, the window
+ * is a rolling range starting at `reference + offsetDays`.
+ *
+ * @param reference - base date; normalized to local midnight
+ * @param offsetDays - signed day offset added to reference
+ * @param dayCount - 1, 3, or 7 columns
+ * @param firstDayOfWeek - 0 (Sunday) or 1 (Monday); only used for dayCount === 7
+ * @returns local-midnight `start` and array of `dayCount` local-midnight Dates
+ */
+export function snapToWindow(
+  reference: Date,
+  offsetDays: number,
+  dayCount: 1 | 3 | 7,
+  firstDayOfWeek: 0 | 1,
+): { start: Date; days: Date[] } {
+  const base = startOfDay(reference);
+  base.setDate(base.getDate() + offsetDays);
+  const start = dayCount === 7 ? startOfWeek(base, firstDayOfWeek) : base;
+  return { start, days: buildDayWindow(start, dayCount) };
+}
+
+//-----------------------------------------------------------------------------
+// RESPONSIVE LAYOUT
+//-----------------------------------------------------------------------------
+
+/**
+ * Clamps a navigation offset (current + delta) to the valid range [0, max].
+ * Pure helper extracted from the host's `_shiftDays` so the math is testable.
+ *
+ * @param current - current `viewOffsetDays`
+ * @param delta - signed shift in days (positive = forward, negative = backward)
+ * @param max - upper bound, typically `time_grid_navigation_days - visibleDays`
+ */
+export function clampOffset(current: number, delta: number, max: number): number {
+  return Math.max(0, Math.min(max, current + delta));
+}
+
+/**
+ * Picks 1, 3, or 7 visible days based on container width and breakpoints,
+ * applying `cap` as the maximum. A `widthPx === 0` input is the
+ * pre-measurement fallback and returns `cap` directly.
+ *
+ * @param widthPx - measured host width in pixels (0 = unmeasured)
+ * @param bpThreeDayPx - minimum width to consider 3-day layout
+ * @param bpSevenDayPx - minimum width to consider 7-day layout
+ * @param cap - configured upper bound (1, 3, or 7)
+ */
+export function chooseVisibleDays(
+  widthPx: number,
+  bpThreeDayPx: number,
+  bpSevenDayPx: number,
+  cap: 1 | 3 | 7,
+): 1 | 3 | 7 {
+  if (widthPx === 0) return cap;
+  if (widthPx >= bpSevenDayPx && cap >= 7) return 7;
+  if (widthPx >= bpThreeDayPx && cap >= 3) return 3;
+  return 1;
+}
+
+//-----------------------------------------------------------------------------
+// EVENT PLACEMENT
+//-----------------------------------------------------------------------------
+
+/**
+ * Computes pixel placement of a timed event within the grid hour-band.
+ * Returns `outsideRange: true` for malformed (end <= start) or fully-out-of-band
+ * inputs. Clamps top/bottom to the band; height is clamped before applying
+ * `minHeightPx`, so a clamped event never visually exceeds the band.
+ *
+ * @param startMin - event start, minutes from local midnight
+ * @param endMin - event end, minutes from local midnight (half-open)
+ * @param gridStartMin - grid top edge, minutes from local midnight
+ * @param gridEndMin - grid bottom edge, minutes from local midnight
+ * @param slotHeightPx - pixels per `intervalMin`
+ * @param intervalMin - minutes per slot (typically 30)
+ * @param minHeightPx - minimum visual height for very short events
+ */
+export function computeEventPlacement(
+  startMin: number,
+  endMin: number,
+  gridStartMin: number,
+  gridEndMin: number,
+  slotHeightPx: number,
+  intervalMin: number,
+  minHeightPx: number,
+): EventPlacement {
+  const empty: EventPlacement = {
+    topPx: 0,
+    heightPx: 0,
+    clippedTop: false,
+    clippedBottom: false,
+    outsideRange: true,
+  };
+  if (endMin <= startMin) return empty;
+  if (endMin <= gridStartMin) return empty;
+  if (startMin >= gridEndMin) return empty;
+
+  const clippedTop = startMin < gridStartMin;
+  const clippedBottom = endMin > gridEndMin;
+  const visibleStart = Math.max(startMin, gridStartMin);
+  const visibleEnd = Math.min(endMin, gridEndMin);
+  const pxPerMin = slotHeightPx / intervalMin;
+
+  const topPx = (visibleStart - gridStartMin) * pxPerMin;
+  const rawHeight = (visibleEnd - visibleStart) * pxPerMin;
+  const bandHeight = (gridEndMin - gridStartMin) * pxPerMin;
+  const maxHeight = bandHeight - topPx;
+  const heightPx = Math.min(maxHeight, Math.max(rawHeight, minHeightPx));
+
+  return { topPx, heightPx, clippedTop, clippedBottom, outsideRange: false };
+}
+
+/**
+ * Parameters shared by every column when bucketing pre-split segments.
+ */
+export interface BucketParams {
+  gridStartMin: number;
+  gridEndMin: number;
+  slotHeightPx: number;
+  intervalMin: number;
+  minHeightPx: number;
+}
+
+/**
+ * Distributes already-day-split timed segments into per-column buckets and
+ * counts segments whose placement falls entirely outside the visible hour
+ * band. The visible buckets feed `layoutOverlaps`; the per-column hidden
+ * counts drive the FR-2.6 "+N hidden" pill rendered at the top of each
+ * day-column.
+ *
+ * Counts are per-column-index, never global — a hidden segment is attributed
+ * to the column it would have rendered into. Segments lacking a `dateTime`
+ * boundary or whose start falls outside `[days[i], days[i] + 1d)` for every
+ * `i` are silently ignored (they cannot be attributed to any visible column).
+ *
+ * @param segments - pre-split timed segments (one event may have already been
+ *                   split into per-day pieces by `splitTimedEventByDay`)
+ * @param days - local-midnight Dates of the visible columns
+ * @param params - placement parameters (band edges, slot/interval, min height)
+ * @returns visible buckets ready for `layoutOverlaps` + per-column hidden counts
+ */
+export function bucketAndPlaceSegments(
+  segments: ReadonlyArray<Types.CalendarEventData>,
+  days: ReadonlyArray<Date>,
+  params: BucketParams,
+): { buckets: PlacedSegment[][]; hiddenCounts: number[] } {
+  const buckets: PlacedSegment[][] = days.map(() => []);
+  const hiddenCounts: number[] = days.map(() => 0);
+
+  for (let i = 0; i < days.length; i++) {
+    const dayStart = days[i];
+    const nextDay = new Date(dayStart);
+    nextDay.setDate(nextDay.getDate() + 1);
+
+    for (const seg of segments) {
+      if (!seg.start.dateTime || !seg.end.dateTime) continue;
+      const segStart = new Date(seg.start.dateTime);
+      if (segStart < dayStart || segStart >= nextDay) continue;
+
+      const segEnd = new Date(seg.end.dateTime);
+      const startMin = minutesFromMidnight(segStart);
+      // An event ending exactly at the next local midnight should occupy the
+      // full-day band (1440), not wrap to 0 — the latter would make the
+      // segment look zero-length to computeEventPlacement.
+      const endMin = segEnd.getTime() >= nextDay.getTime() ? 24 * 60 : minutesFromMidnight(segEnd);
+
+      const placement = computeEventPlacement(
+        startMin,
+        endMin,
+        params.gridStartMin,
+        params.gridEndMin,
+        params.slotHeightPx,
+        params.intervalMin,
+        params.minHeightPx,
+      );
+
+      if (placement.outsideRange) {
+        hiddenCounts[i]++;
+        continue;
+      }
+
+      buckets[i].push({ event: seg, startMin, endMin, placement });
+    }
+  }
+
+  return { buckets, hiddenCounts };
+}
+
+//-----------------------------------------------------------------------------
+// OVERLAP LAYOUT
+//-----------------------------------------------------------------------------
+
+/**
+ * Cluster-based packing of overlapping events. Sorts internally by `startMin`
+ * ascending, then walks events forming clusters of pairwise-transitive
+ * overlap. Within a cluster, lanes are assigned greedily (lowest free index);
+ * `laneCount` is the cluster's max simultaneous overlap. Half-open intervals:
+ * an event ending at T does not overlap one starting at T.
+ *
+ * @param events - array of records carrying `startMin`/`endMin`
+ * @returns same records with `laneIndex` and `laneCount` attached, in sorted order
+ */
+export function layoutOverlaps<T extends OverlapInput>(events: T[]): LayoutResult<T>[] {
+  const sorted = [...events].sort((a, b) => a.startMin - b.startMin);
+  const out: LayoutResult<T>[] = [];
+
+  let clusterStartIdx = 0;
+  let clusterMaxEnd = -Infinity;
+  const clusterLaneEnds: number[] = [];
+  const clusterLaneIdxs: number[] = [];
+
+  const flush = (uptoExclusive: number): void => {
+    const laneCount = clusterLaneEnds.length;
+    for (let i = clusterStartIdx; i < uptoExclusive; i++) {
+      out[i] = { ...sorted[i], laneIndex: clusterLaneIdxs[i - clusterStartIdx], laneCount };
+    }
+  };
+
+  for (let i = 0; i < sorted.length; i++) {
+    const ev = sorted[i];
+    if (ev.startMin >= clusterMaxEnd) {
+      flush(i);
+      clusterStartIdx = i;
+      clusterMaxEnd = ev.endMin;
+      clusterLaneEnds.length = 0;
+      clusterLaneIdxs.length = 0;
+    } else if (ev.endMin > clusterMaxEnd) {
+      clusterMaxEnd = ev.endMin;
+    }
+
+    let lane = -1;
+    for (let l = 0; l < clusterLaneEnds.length; l++) {
+      if (clusterLaneEnds[l] <= ev.startMin) {
+        lane = l;
+        break;
+      }
+    }
+    if (lane === -1) {
+      lane = clusterLaneEnds.length;
+      clusterLaneEnds.push(ev.endMin);
+    } else {
+      clusterLaneEnds[lane] = ev.endMin;
+    }
+    clusterLaneIdxs.push(lane);
+  }
+  flush(sorted.length);
+
+  return out;
+}
+
+//-----------------------------------------------------------------------------
+// EVENT SPLITTING
+//-----------------------------------------------------------------------------
+
+/**
+ * Splits a single timed event by local-day boundaries within `[windowStart, windowEnd)`.
+ * Each returned segment preserves all fields of the original (summary, location,
+ * description, _entityId, _matchedConfig, _entityLabel, …) via shallow spread,
+ * replacing only `start` and `end`. Zero-duration segments (e.g. an event ending
+ * exactly at midnight produces no second-day segment) are dropped.
+ *
+ * Shared-reference safety: `_matchedConfig` (and other reference fields) are
+ * shared between segments and the original event. This is safe by current
+ * invariant — `_matchedConfig` is assigned exactly once during processing in
+ * `events.ts:637` (`event._matchedConfig = …`) and is read-only thereafter
+ * (downstream call sites only read `event._matchedConfig.<field>`; verified
+ * via `grep -n "_matchedConfig" src/`). If a future change introduces a
+ * post-fetch mutation of `_matchedConfig`, switch to a deep clone here.
+ *
+ * @param event - timed event with start.dateTime and end.dateTime as local ISO
+ * @param windowStart - inclusive local-midnight lower bound
+ * @param windowEnd - exclusive local-midnight upper bound
+ */
+export function splitTimedEventByDay(
+  event: Types.CalendarEventData,
+  windowStart: Date,
+  windowEnd: Date,
+): Types.CalendarEventData[] {
+  if (!event.start.dateTime || !event.end.dateTime) return [];
+
+  const evStart = new Date(event.start.dateTime);
+  const evEnd = new Date(event.end.dateTime);
+  if (evEnd <= evStart) return [];
+
+  const lower = startOfDay(windowStart);
+  const upper = startOfDay(windowEnd);
+  const out: Types.CalendarEventData[] = [];
+
+  let cursorDay = startOfDay(evStart);
+  if (cursorDay < lower) cursorDay = new Date(lower);
+
+  while (cursorDay < upper) {
+    const nextDay = new Date(cursorDay);
+    nextDay.setDate(nextDay.getDate() + 1);
+
+    const segStart = cursorDay < evStart ? evStart : cursorDay;
+    const segEnd = nextDay < evEnd ? nextDay : evEnd;
+
+    if (segEnd > segStart) {
+      out.push({
+        ...event,
+        start: { dateTime: toLocalIso(segStart) },
+        end: { dateTime: toLocalIso(segEnd) },
+      });
+    }
+
+    if (nextDay >= evEnd) break;
+    cursorDay = nextDay;
+  }
+
+  return out;
+}
+
+//-----------------------------------------------------------------------------
+// REFERENCE DATE / PAST / LABELS
+//-----------------------------------------------------------------------------
+
+/**
+ * Computes the reference start date for the time-grid view. Returns local
+ * midnight.
+ *
+ * Note: this duplicates the math in `getStartDateReference` (private to
+ * `events.ts`). The duplication is mandated by AGENTS.md Rule 5 — we cannot
+ * modify `events.ts` to export the existing function. If Rule 5 is ever
+ * lifted, this helper should delegate to the events-side version.
+ *
+ * @param config - subset of Config with `start_date` and `days_to_show`
+ */
+export function getReferenceDate(config: Pick<Types.Config, 'start_date' | 'days_to_show'>): Date {
+  if (config.start_date && config.start_date.trim() !== '') {
+    return getTimeWindow(config.days_to_show, config.start_date).start;
+  }
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+/**
+ * Backward-expansion headroom (in days) for the grid-view fetch window. The
+ * visible 7-day window can snap up to 6 days backward to align with
+ * `first_day_of_week`; we fetch 7 extra days on the back side to guarantee
+ * the visible window is always covered. (6 would suffice arithmetically; 7
+ * is a single round week and gives us a small safety margin.)
+ */
+export const GRID_FETCH_BACK_HEADROOM_DAYS = 7;
+
+/**
+ * Formats a Date as `YYYY-MM-DD` in local time. Used to build a synthetic
+ * `start_date` that `getTimeWindow` can parse.
+ */
+function toIsoLocalDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Computes the (start_date, days_to_show) override pair the time-grid view
+ * needs to pass to `fetchEventData` so the visible window — which can snap
+ * backward up to 6 days from the user's reference for week alignment — is
+ * always covered by fetched data.
+ *
+ * Returns:
+ * - `startDate`: an ISO `YYYY-MM-DD` string positioned at
+ *   `getReferenceDate(config) - GRID_FETCH_BACK_HEADROOM_DAYS`. Even if the
+ *   user explicitly set `config.start_date`, we shift the same number of
+ *   days backward; the user's intent (where the *visible* range begins) is
+ *   preserved by the renderer's `snapToWindow`, which still reads
+ *   `config.start_date` via `getReferenceDate`.
+ * - `daysToShow`: the user's `time_grid_navigation_days` plus the headroom,
+ *   so the fetch end matches what the user expects.
+ *
+ * @param config - subset of Config with start_date, days_to_show, time_grid_navigation_days
+ */
+export function computeGridFetchRange(
+  config: Pick<Types.Config, 'start_date' | 'days_to_show' | 'time_grid_navigation_days'>,
+): { startDate: string; daysToShow: number } {
+  const reference = getReferenceDate(config);
+  const expanded = new Date(reference);
+  expanded.setDate(expanded.getDate() - GRID_FETCH_BACK_HEADROOM_DAYS);
+  return {
+    startDate: toIsoLocalDate(expanded),
+    daysToShow: config.time_grid_navigation_days + GRID_FETCH_BACK_HEADROOM_DAYS,
+  };
+}
+
+/**
+ * Builds the `fetchEventData` config override the grid view needs.
+ *
+ * Two transformations:
+ *
+ * 1. `start_date` is shifted backward by `GRID_FETCH_BACK_HEADROOM_DAYS` (see
+ *    `computeGridFetchRange` for rationale).
+ * 2. `split_multiday_events` is forced to `false` at both the global level
+ *    and on every entity override. The grid view performs its own
+ *    midnight-aware splitting via `splitTimedEventByDay`; the list-view
+ *    splitter (`processMultiDayEvents` in events.ts) produces synthetic
+ *    all-day segments for the middle days of timed multi-day events that
+ *    would render in the wrong band of the grid (Bug #4 in worklog 0020).
+ *
+ * The returned config is a shallow-cloned modification — the original
+ * config is unchanged. `entities` are cloned individually only when an
+ * override actually contains `split_multiday_events`, to keep churn minimal.
+ *
+ * @param config - the user's full Config
+ * @returns a fetch-mode config; pair its `start_date` with the
+ *          `effectiveDaysToShow` computed by `computeGridFetchRange`
+ */
+export function buildGridFetchConfig(config: Types.Config): Types.Config {
+  const range = computeGridFetchRange(config);
+  const entities = config.entities.map((e) => {
+    if (typeof e === 'string') return e;
+    if (typeof e.split_multiday_events === 'undefined') return e;
+    return { ...e, split_multiday_events: false };
+  });
+  return {
+    ...config,
+    start_date: range.startDate,
+    split_multiday_events: false,
+    entities,
+  };
+}
+
+/**
+ * Whether `event` is past relative to `now`. Timed events compare end-time
+ * strictly after `now`; all-day events apply iCal exclusive-end-adjustment
+ * (subtract one day) and compare `today > endDate` at local-midnight
+ * granularity.
+ *
+ * Note: this duplicates the past-event math inlined at `render.ts:798-832`
+ * (list-view path). The duplication is mandated by AGENTS.md Rule 5 — we
+ * cannot modify `render.ts`. If Rule 5 is ever lifted, both paths should
+ * share this helper.
+ */
+export function isPastEvent(event: Types.CalendarEventData, now: Date): boolean {
+  const isAllDay = !event.start.dateTime;
+
+  if (isAllDay) {
+    if (!event.end.date) return false;
+    const endDate = parseAllDayDate(event.end.date);
+    endDate.setDate(endDate.getDate() - 1);
+    const today = startOfDay(now);
+    return today > endDate;
+  }
+
+  if (!event.end.dateTime) return false;
+  const endDateTime = new Date(event.end.dateTime);
+  return now > endDateTime;
+}
+
+/**
+ * Hour axis label. Pure hour-only formatting (no minutes — that would waste
+ * axis width). 24-hour mode emits the hour zero-padded to two digits ("00",
+ * "01", …, "23") so all rows align visually and `0` isn't ambiguous with
+ * a single-digit timestamp. 12-hour mode emits "12 AM", "1 AM"…"12 PM",
+ * "1 PM"…"11 PM" (no padding — the AM/PM suffix already disambiguates).
+ */
+export function formatHourLabel(hour: number, use24h: boolean): string {
+  if (use24h) return String(hour).padStart(2, '0');
+  if (hour === 0) return '12 AM';
+  if (hour < 12) return `${hour} AM`;
+  if (hour === 12) return '12 PM';
+  return `${hour - 12} PM`;
+}
+
+/**
+ * Approximate card size in 50px-row units for Home Assistant's masonry view.
+ * Returns 1 for the list view (matches HA's documented default when the
+ * method is not defined). For the time-grid view, sums the visible-band
+ * pixel height (computed from start/end hour, interval, and SLOT_HEIGHT_PX)
+ * plus a small chrome allowance for the nav bar and day headers, then
+ * clamps to `max_height` when it is a px value.
+ */
+export function computeCardSize(
+  config: Pick<
+    Types.Config,
+    | 'view'
+    | 'time_grid_start_hour'
+    | 'time_grid_end_hour'
+    | 'time_grid_interval_minutes'
+    | 'max_height'
+  >,
+): number {
+  if (config.view !== 'time-grid') return 1;
+
+  const slotsPerHour = 60 / config.time_grid_interval_minutes;
+  const gridPx =
+    (config.time_grid_end_hour - config.time_grid_start_hour) * slotsPerHour * SLOT_HEIGHT_PX;
+  const chromePx = NAV_BAR_PX + DAY_HEADER_PX + ALLDAY_RESERVE_PX;
+  let totalPx = gridPx + chromePx;
+
+  const mh = config.max_height;
+  if (mh && mh !== 'none' && mh.endsWith('px')) {
+    const mhPx = parseFloat(mh);
+    if (!isNaN(mhPx)) totalPx = Math.min(totalPx, mhPx);
+  }
+
+  return Math.max(1, Math.ceil(totalPx / 50));
+}
+
+/**
+ * Result of placing an all-day banner inside a visible window.
+ * - `dayIdx` is the 0-based column where the banner starts (clamped to 0 when
+ *   the event begins before the window).
+ * - `numDays` is the number of visible columns the banner occupies after
+ *   clamping; 0 when the event has no overlap with the window.
+ * - `startedBefore` / `continuesAfter` indicate the event extends past the
+ *   visible window on the corresponding side and drive the ◂ / ▸ overflow
+ *   indicators.
+ * - `visible` is `false` when the event has no overlap with the window or is
+ *   malformed (`numDays <= 0`); callers may skip rendering in that case.
+ */
+export interface BannerPlacement {
+  dayIdx: number;
+  numDays: number;
+  startedBefore: boolean;
+  continuesAfter: boolean;
+  visible: boolean;
+}
+
+/**
+ * Computes the column placement of an all-day banner inside a visible window.
+ *
+ * Caller responsibilities:
+ * - Both `eventStartDay` and `eventEndDay` must be at local midnight (use
+ *   `parseAllDayDate`).
+ * - `eventEndDay` must be the **inclusive** last day of the event; the iCal
+ *   exclusive-end adjustment (`setDate(getDate() - 1)`) is the caller's job.
+ * - `windowStart` is the local-midnight first visible column.
+ *
+ * @param eventStartDay - inclusive first day of the event, local midnight
+ * @param eventEndDay - inclusive last day of the event, local midnight
+ * @param windowStart - inclusive first visible day, local midnight
+ * @param visibleDays - number of visible columns (1, 3, or 7)
+ */
+export function computeBannerPlacement(
+  eventStartDay: Date,
+  eventEndDay: Date,
+  windowStart: Date,
+  visibleDays: 1 | 3 | 7,
+): BannerPlacement {
+  const rawDayIdx = daysBetween(windowStart, eventStartDay);
+  const dayIdx = Math.max(0, rawDayIdx);
+  const clampOffset = Math.max(0, -rawDayIdx);
+  const originalSpan = daysBetween(eventStartDay, eventEndDay) + 1;
+  const numDays = Math.min(originalSpan - clampOffset, visibleDays - dayIdx);
+
+  if (numDays <= 0) {
+    return { dayIdx: 0, numDays: 0, startedBefore: false, continuesAfter: false, visible: false };
+  }
+
+  const startedBefore = clampOffset > 0;
+  const continuesAfter = originalSpan - clampOffset > visibleDays - dayIdx;
+
+  return { dayIdx, numDays, startedBefore, continuesAfter, visible: true };
+}
+
+/**
+ * Compute the offset (in days from the fetch reference) needed to bring today
+ * into the visible window. Used by the host's onResetToToday handler so
+ * clicking "Today" works even when start_date moves the reference away from
+ * today.
+ *
+ * For 1- and 3-day modes (no week snap), clamps into [0, navigationDays - visibleDays].
+ * For 7-day mode, the renderer snaps the window backward to `firstDayOfWeek`,
+ * so a clamped offset can yield a window that does NOT contain today (E-1).
+ * In that mode we instead return the offset whose snapped window contains
+ * today's week — `daysBetween(ref, startOfWeek(today, firstDayOfWeek))` —
+ * even when that exceeds `navigationDays - visibleDays`. The "Today" button's
+ * job is to put today in view; navigation arrows separately enforce
+ * `_maxOffset` for sequential paging.
+ *
+ * A future start_date (today < reference) yields 0 (R-22 in the design doc).
+ */
+export function computeTodayOffset(
+  reference: Date,
+  today: Date,
+  visibleDays: 1 | 3 | 7,
+  navigationDays: number,
+  firstDayOfWeek: 0 | 1,
+): number {
+  const diffDays = daysBetween(reference, today);
+  if (diffDays < 0) return 0;
+
+  if (visibleDays !== 7) {
+    const max = Math.max(0, navigationDays - visibleDays);
+    return Math.min(max, diffDays);
+  }
+
+  // 7-day mode: any offset whose snapped window contains today's week works.
+  // snapToWindow does `startOfWeek(ref + offset, fdow)`. Picking
+  // offset = daysBetween(ref, startOfWeek(today, fdow)) makes the snap a
+  // no-op and the resulting window is [todayWeekStart, todayWeekStart + 7).
+  const todayWeekStart = startOfWeek(today, firstDayOfWeek);
+  const targetOffset = daysBetween(reference, todayWeekStart);
+  return Math.max(0, targetOffset);
+}
+
+/**
+ * Pixel offset (top) for the current-time line within today's day column.
+ * Returns null when `now` is outside the visible hour band, signaling the
+ * caller to hide the line.
+ *
+ * @param minutesNow - current time, minutes from local midnight
+ * @param gridStartMin - grid top edge, minutes from local midnight
+ * @param gridEndMin - grid bottom edge, minutes from local midnight
+ * @param slotHeightPx - pixels per `intervalMin`
+ * @param intervalMin - minutes per slot (typically 30)
+ */
+export function computeNowLineTop(
+  minutesNow: number,
+  gridStartMin: number,
+  gridEndMin: number,
+  slotHeightPx: number,
+  intervalMin: number,
+): number | null {
+  if (minutesNow < gridStartMin || minutesNow >= gridEndMin) return null;
+  return ((minutesNow - gridStartMin) / intervalMin) * slotHeightPx;
+}
+
+/**
+ * Detect whether `now` falls on a different local-day than the cached
+ * `lastRenderDayMs` (a `startOfDay(...).getTime()` snapshot). Used by the
+ * host's now-line tick to trigger `requestUpdate()` when the local date
+ * has rolled over, so the "today" highlight migrates to the new day-column
+ * without waiting for the next user action.
+ */
+export function hasDayChanged(lastRenderDayMs: number, now: Date): boolean {
+  return startOfDay(now).getTime() !== lastRenderDayMs;
+}
+
+//-----------------------------------------------------------------------------
+// INTERNAL HELPERS
+//-----------------------------------------------------------------------------
+
+/**
+ * Local ISO string with no timezone suffix, matching the input format produced
+ * by HA when `dateTime` lacks an explicit zone (e.g. "2026-05-13T22:00:00").
+ */
+function toLocalIso(d: Date): string {
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(
+    d.getMinutes(),
+  )}:${pad(d.getSeconds())}`;
+}

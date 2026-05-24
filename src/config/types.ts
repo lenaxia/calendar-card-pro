@@ -109,6 +109,34 @@ export interface Config {
   // Weather
   weather?: WeatherConfig;
 
+  // Time-grid view
+  /** View mode discriminator. `'list'` renders the existing list view; `'time-grid'` renders the Google-Calendar-style time-grid view. */
+  view: 'list' | 'time-grid';
+  /** First hour visible on the time-grid (0..23, inclusive). Must be < `time_grid_end_hour`. */
+  time_grid_start_hour: number;
+  /** Last hour visible on the time-grid (1..24, inclusive end-of-day = 24). Must be > `time_grid_start_hour`. */
+  time_grid_end_hour: number;
+  /** Vertical slot granularity in minutes. One of 15, 30, or 60. */
+  time_grid_interval_minutes: 15 | 30 | 60;
+  /** Minimum rendered height in pixels for any event chip on the grid, regardless of duration. */
+  time_grid_event_min_height_px: number;
+  /** Whether to draw the horizontal "now" indicator line on the grid for the current day. */
+  time_grid_show_now_line: boolean;
+  /** Maximum number of day columns the grid will render at any width. The responsive width-based selection picks 1, 3, or 7 up to this cap. */
+  time_grid_max_days: 1 | 3 | 7;
+  /** Minimum host width in pixels at which the grid promotes from 1-day to 3-day layout. */
+  time_grid_breakpoint_three_day_px: number;
+  /** Minimum host width in pixels at which the grid promotes from 3-day to 7-day layout. */
+  time_grid_breakpoint_seven_day_px: number;
+  /** Total number of days fetched and navigable in the time-grid view. The user can shift the visible window forward/backward within this range. */
+  time_grid_navigation_days: number;
+  /**
+   * Background opacity for all-day banner rows in the time-grid view.
+   * Scale: 0..100 (matches existing event_background_opacity convention;
+   * see helpers.ts:convertToRGBA which divides by 100 internally). Default 20.
+   */
+  time_grid_allday_bg_opacity: number;
+
   // Actions
   tap_action: ActionConfig;
   hold_action: ActionConfig;
