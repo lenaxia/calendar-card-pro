@@ -856,7 +856,7 @@ export const cardStyles = css`
        config changes start/end hour. */
     height: var(--calendar-card-grid-column-height, 768px);
     overflow: hidden;
-    border-inline-start: 1px solid var(--calendar-card-day-separator-color, transparent);
+    border-inline-start: 1px solid color-mix(in srgb, var(--primary-text-color) 10%, transparent);
     /* Alternating hour-row backgrounds + hour boundary lines for visual alignment */
     background-image:
       repeating-linear-gradient(
@@ -922,6 +922,16 @@ export const cardStyles = css`
     z-index: 2;
     /* Slight inset so adjacent lane events don't touch */
     margin-inline-end: 1px;
+    cursor: pointer;
+    transition: filter 0.15s ease;
+  }
+
+  .ccp-grid-event:hover {
+    filter: brightness(1.1);
+  }
+
+  .ccp-grid-event:active {
+    filter: brightness(0.9);
   }
 
   .ccp-grid-event.past-event {

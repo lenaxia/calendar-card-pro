@@ -428,6 +428,18 @@ function renderEventBlock(
         left: `${leftPct}%`,
         width: `calc(${widthPct}% - 2px)`,
       })}
+      @click=${(e: Event) => {
+        e.stopPropagation();
+        if (event._entityId) {
+          const moreInfo = new CustomEvent('hass-more-info', {
+            bubbles: true,
+            composed: true,
+            detail: { entityId: event._entityId },
+          });
+          (e.currentTarget as HTMLElement).dispatchEvent(moreInfo);
+        }
+      }}
+      @pointerdown=${navPointerDown}
     >
       <div class="ccp-grid-event-title">${event.summary ?? ''}</div>
       ${placement.heightPx >= TIME_VISIBLE_HEIGHT_PX && startDate && endDate
