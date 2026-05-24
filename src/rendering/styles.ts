@@ -975,16 +975,15 @@ export const cardStyles = css`
 
   .ccp-grid-event-time {
     font-size: var(--calendar-card-font-size-time);
-    color: var(--calendar-card-color-time);
-    opacity: 0.9;
+    opacity: 0.85;
   }
 
   .ccp-grid-event-location {
     font-size: var(--calendar-card-font-size-location);
-    color: var(--calendar-card-color-location);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    opacity: 0.85;
   }
 
   .ccp-grid-hidden-pill {
@@ -1086,5 +1085,36 @@ export const cardStyles = css`
   .ccp-event-detail-desc span {
     white-space: pre-wrap;
     word-break: break-word;
+  }
+
+  .ccp-event-detail-link {
+    color: var(--primary-color, #03a9f4);
+    text-decoration: none;
+    flex: 1;
+    word-break: break-word;
+  }
+
+  .ccp-event-detail-link:hover {
+    text-decoration: underline;
+  }
+
+  .ccp-event-detail-location {
+    align-items: flex-start;
+  }
+
+  .ccp-event-detail-copy {
+    background: transparent;
+    border: 1px solid color-mix(in srgb, var(--primary-text-color) 20%, transparent);
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--secondary-text-color);
+    font-size: 14px;
+    padding: 2px 6px;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+
+  .ccp-event-detail-copy:hover {
+    background: color-mix(in srgb, var(--primary-text-color) 8%, transparent);
   }
 `;

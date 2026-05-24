@@ -780,9 +780,27 @@ class CalendarCardPro extends LitElement {
                 </div>`
               : ''}
             ${d.location
-              ? html`<div class="ccp-event-detail-row">
+              ? html`<div class="ccp-event-detail-row ccp-event-detail-location">
                   <ha-icon icon="mdi:map-marker-outline"></ha-icon>
-                  <span>${d.location}</span>
+                  <a
+                    href="https://maps.google.com/?q=${encodeURIComponent(d.location)}"
+                    target="_blank"
+                    rel="noopener"
+                    class="ccp-event-detail-link"
+                  >${d.location}</a>
+                  <button
+                    class="ccp-event-detail-copy"
+                    @click=${(e: Event) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(d.location);
+                      const btn = e.currentTarget as HTMLElement;
+                      btn.textContent = '✓';
+                      setTimeout(() => {
+                        btn.textContent = '⧉';
+                      }, 1500);
+                    }}
+                    title="Copy location"
+                  >⧉</button>
                 </div>`
               : ''}
             ${d.description
