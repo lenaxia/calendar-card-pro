@@ -430,14 +430,34 @@ function renderEventBlock(
       })}
       @click=${(e: Event) => {
         e.stopPropagation();
-        if (event._entityId) {
-          const moreInfo = new CustomEvent('hass-more-info', {
+        const el = e.currentTarget as HTMLElement;
+        const dtstart = event.start.dateTime ?? event.start.date ?? '';
+        const dtend = event.end.dateTime ?? event.end.date ?? '';
+        // Try HA's built-in calendar event detail dialog
+        el.dispatchEvent(
+          new CustomEvent('show-dialog', {
             bubbles: true,
             composed: true,
-            detail: { entityId: event._entityId },
-          });
-          (e.currentTarget as HTMLElement).dispatchEvent(moreInfo);
-        }
+            detail: {
+              dialogTag: 'dialog-calendar-event-detail',
+              dialogImport: () =>
+                customElements.whenDefined('dialog-calendar-event-detail'),
+              dialogParams: {
+                calendarId: event._entityId ?? '',
+                entry: {
+                  summary: event.summary ?? '',
+                  dtstart,
+                  dtend,
+                  description: event.description ?? '',
+                  location: event.location ?? '',
+                },
+                canDelete: false,
+                canEdit: false,
+                updated: () => {},
+              },
+            },
+          }),
+        );
       }}
       @pointerdown=${navPointerDown}
     >
