@@ -90,9 +90,21 @@ const buildSwipeEnd =
   (e: TouchEvent): void => {
     const dx = e.changedTouches[0].clientX - swipeStartX;
     if (Math.abs(dx) < SWIPE_THRESHOLD_PX) return;
+    const target = e.currentTarget as HTMLElement;
+    const columns = target.querySelector('.ccp-grid-columns') as HTMLElement | null;
     if (dx > 0 && ctx.canShiftBack) {
+      if (columns) {
+        columns.classList.remove('swipe-left', 'swipe-right');
+        void columns.offsetWidth; // force reflow to restart animation
+        columns.classList.add('swipe-right');
+      }
       ctx.onShiftDay(-1);
     } else if (dx < 0 && ctx.canShiftForward) {
+      if (columns) {
+        columns.classList.remove('swipe-left', 'swipe-right');
+        void columns.offsetWidth;
+        columns.classList.add('swipe-left');
+      }
       ctx.onShiftDay(1);
     }
   };

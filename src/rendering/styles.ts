@@ -127,6 +127,8 @@ export const cardStyles = css`
 
   ha-card.view-grid {
     cursor: default;
+    user-select: text;
+    -webkit-user-select: text;
   }
 
   /* Focus states */
@@ -847,6 +849,25 @@ export const cardStyles = css`
   .ccp-grid-columns {
     display: grid;
     position: relative;
+    transition: transform 0.2s ease-out;
+  }
+
+  .ccp-grid-columns.swipe-left {
+    animation: ccp-swipe-left 0.25s ease-out;
+  }
+
+  .ccp-grid-columns.swipe-right {
+    animation: ccp-swipe-right 0.25s ease-out;
+  }
+
+  @keyframes ccp-swipe-left {
+    0% { transform: translateX(30px); opacity: 0.7; }
+    100% { transform: translateX(0); opacity: 1; }
+  }
+
+  @keyframes ccp-swipe-right {
+    0% { transform: translateX(-30px); opacity: 0.7; }
+    100% { transform: translateX(0); opacity: 1; }
   }
 
   .ccp-grid-day-column {
@@ -1039,6 +1060,8 @@ export const cardStyles = css`
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
     max-height: 80%;
     overflow-y: auto;
+    user-select: text;
+    -webkit-user-select: text;
   }
 
   .ccp-event-detail-header {
