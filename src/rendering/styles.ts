@@ -1087,19 +1087,13 @@ export const cardStyles = css`
     word-break: break-word;
   }
 
-  .ccp-event-detail-link {
-    color: var(--primary-color, #03a9f4);
-    text-decoration: none;
-    flex: 1;
-    word-break: break-word;
-  }
-
-  .ccp-event-detail-link:hover {
-    text-decoration: underline;
-  }
-
   .ccp-event-detail-location {
     align-items: flex-start;
+  }
+
+  .ccp-event-detail-loc-text {
+    flex: 1;
+    word-break: break-word;
   }
 
   .ccp-event-detail-copy {

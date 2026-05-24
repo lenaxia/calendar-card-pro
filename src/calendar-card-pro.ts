@@ -782,12 +782,7 @@ class CalendarCardPro extends LitElement {
             ${d.location
               ? html`<div class="ccp-event-detail-row ccp-event-detail-location">
                   <ha-icon icon="mdi:map-marker-outline"></ha-icon>
-                  <a
-                    href="https://maps.google.com/?q=${encodeURIComponent(d.location)}"
-                    target="_blank"
-                    rel="noopener"
-                    class="ccp-event-detail-link"
-                  >${d.location}</a>
+                  <span class="ccp-event-detail-loc-text">${d.location}</span>
                   <button
                     class="ccp-event-detail-copy"
                     @click=${(e: Event) => {
