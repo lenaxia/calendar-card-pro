@@ -9,7 +9,7 @@ const compat = new FlatCompat();
 
 export default [
   {
-    files: ['src/**/*.ts'],
+    files: ['src/**/*.ts', 'test/**/*.ts'],
     languageOptions: {
       parser: tsParser,
       parserOptions: {

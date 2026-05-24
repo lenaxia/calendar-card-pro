@@ -29,10 +29,14 @@ src/
 └── utils/                        # Utility functions
     ├── events.ts                 # Calendar event fetching and processing
     ├── format.ts                 # Date and text formatting
+    ├── grid.ts                   # Pure helpers for the time-grid view (date math, event placement, overlap layout, banner placement, now-line position, today-offset, card size)
     ├── helpers.ts                # Generic utilities (color, ID generation)
     ├── logger.ts                 # Logging system
     └── weather.ts                # Weather data fetching and processing
 ```
+
+The `rendering/` directory also contains:
+- `render-grid.ts` — render functions for the time-grid view (separate from the list-view renderer in `render.ts` to keep the existing path byte-identical).
 
 ## Module Responsibilities
 
@@ -210,10 +214,41 @@ graph TD
    - Loading, error, and empty states are handled appropriately
 
 4. **Refresh Mechanisms**:
-   - Automatic refresh via `refresh_interval` configuration
-   - Manual refresh when page visibility changes
-   - Forced refresh when configuration changes
-   - Cache invalidation based on timing and parameters
+    - Automatic refresh via `refresh_interval` configuration
+    - Manual refresh when page visibility changes
+    - Forced refresh when configuration changes
+    - Cache invalidation based on timing and parameters
+
+### Time-Grid View Data Flow
+
+The time-grid view (`view: 'time-grid'`) shares the same fetch pipeline as
+the list view but bypasses `groupEventsByDay`. Instead, the host's `render()`
+dispatches to `renderTimeGrid` (in `rendering/render-grid.ts`), which:
+
+1. Builds a window of `1 | 3 | 7` midnight Dates via `Grid.snapToWindow`
+   (week-aligned for 7-day, rolling for 1/3-day).
+2. Filters `this.events` to the window, then drops timed past events when
+   `show_past_events: false` (FR-2.11; all-day past events are kept and
+   dimmed via the `past-event` class).
+3. Splits cross-midnight timed events with `Grid.splitTimedEventByDay`.
+4. Per-day, computes pixel placement (`Grid.computeEventPlacement`) and
+   packs overlapping events into lanes (`Grid.layoutOverlaps`).
+5. Renders banners (`Grid.computeBannerPlacement`), the now-line element,
+   and timed-event blocks.
+
+The host attaches a `ResizeObserver` only when grid view is active, picking
+the column count via `Grid.chooseVisibleDays` (1/3/7 by breakpoint). A 60s
+interval mutates the now-line's `style.top` imperatively (no full re-render)
+and detects midnight rollover via `Grid.hasDayChanged` to refresh the
+"today" highlight.
+
+`fetchEventData` accepts an optional `effectiveDaysToShow` argument that the
+host supplies as `time_grid_navigation_days` when in grid view, decoupling
+the grid's fetch range from `days_to_show` (which still drives list view).
+This keeps the list-view fetch path byte-identical (existing callers pass
+nothing for this arg). `hasConfigChanged` was made view-aware so toggling
+between list and grid view triggers a refetch even though `days_to_show`
+hasn't changed.
 
 ### Interaction Flow
 
