@@ -125,6 +125,12 @@ export const cardStyles = css`
     cursor: pointer;
   }
 
+  ha-card.view-grid {
+    cursor: default;
+    user-select: text;
+    -webkit-user-select: text;
+  }
+
   /* Focus states */
   ha-card:focus {
     outline: none;
@@ -148,17 +154,14 @@ export const cardStyles = css`
     overflow-y: auto;
     padding-bottom: 1px;
     hyphens: auto;
-
-    /* Hide scrollbars across browsers */
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE/Edge */
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
   }
 
-  /* Show scrollbars on hover */
+  /* Show scrollbar track on hover */
   .content-container:hover {
-    scrollbar-width: thin; /* Firefox */
-    scrollbar-color: var(--secondary-text-color) transparent; /* Firefox */
-    -ms-overflow-style: auto; /* IE/Edge */
+    scrollbar-color: var(--secondary-text-color) transparent;
   }
 
   .card-header-placeholder {
@@ -700,5 +703,468 @@ export const cardStyles = css`
     to {
       transform: rotate(360deg);
     }
+  }
+
+  /* ===== Time-grid view ===== */
+  .ccp-grid {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .ccp-grid-nav {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+  }
+
+  .ccp-grid-nav button {
+    background: transparent;
+    border: none;
+    color: inherit;
+    font: inherit;
+    min-width: 36px;
+    min-height: 36px;
+    padding: 4px 10px;
+    cursor: pointer;
+    border-radius: 8px;
+    font-size: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.15s ease;
+  }
+
+  .ccp-grid-nav button:hover {
+    background: color-mix(in srgb, var(--primary-text-color) 8%, transparent);
+  }
+
+  .ccp-grid-nav button:active {
+    background: color-mix(in srgb, var(--primary-text-color) 16%, transparent);
+  }
+
+  .ccp-grid-nav button.ccp-grid-today {
+    font-size: var(--calendar-card-font-size-event);
+    font-weight: 500;
+    background: color-mix(in srgb, var(--calendar-card-line-color-vertical) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--calendar-card-line-color-vertical) 30%, transparent);
+    color: var(--calendar-card-line-color-vertical);
+    padding: 4px 14px;
+  }
+
+  .ccp-grid-nav button.ccp-grid-today:hover {
+    background: color-mix(in srgb, var(--calendar-card-line-color-vertical) 20%, transparent);
+  }
+
+  .ccp-grid-nav button.ccp-grid-today:active {
+    background: color-mix(in srgb, var(--calendar-card-line-color-vertical) 30%, transparent);
+  }
+
+  .ccp-grid-month-label {
+    margin-inline-start: auto;
+    font-size: var(--calendar-card-font-size-event);
+    font-weight: 500;
+    color: var(--calendar-card-color-weekday);
+  }
+
+  .ccp-grid-nav button:focus-visible {
+    outline: 2px solid var(--calendar-card-line-color-vertical);
+    outline-offset: 1px;
+  }
+
+  .ccp-grid-nav button[disabled],
+  .ccp-grid-nav button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  .ccp-grid-headers,
+  .ccp-grid-allday {
+    display: grid;
+  }
+
+  .ccp-grid-axis-spacer {
+    width: var(--calendar-card-grid-time-axis-width, 48px);
+  }
+
+  .ccp-grid-day-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 4px 2px;
+    font-size: var(--calendar-card-font-size-weekday);
+    color: var(--calendar-card-color-weekday);
+  }
+
+  .ccp-grid-day-header.today {
+    color: var(--calendar-card-line-color-vertical);
+    font-weight: 600;
+  }
+
+  .ccp-grid-day-header-weekday {
+    font-size: var(--calendar-card-font-size-weekday);
+    line-height: 1.2;
+  }
+
+  .ccp-grid-day-header-daynum {
+    font-size: var(--calendar-card-font-size-day);
+    color: var(--calendar-card-color-day);
+    line-height: 1.2;
+  }
+
+  .ccp-grid-day-header-month {
+    font-size: var(--calendar-card-font-size-month);
+    color: var(--calendar-card-color-month);
+    line-height: 1.2;
+  }
+
+  .ccp-grid-day-header-weather {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    margin-top: 2px;
+    opacity: 0.85;
+  }
+
+  .ccp-grid-day-header-weather ha-icon {
+    margin: 0;
+  }
+
+  .ccp-grid-weather-low {
+    opacity: 0.7;
+  }
+
+  .ccp-grid-allday {
+    max-height: var(--calendar-card-grid-allday-max-height, 6em);
+    overflow: hidden;
+  }
+
+  .ccp-grid-body {
+    display: grid;
+    grid-template-columns: var(--calendar-card-grid-time-axis-width, 48px) 1fr;
+  }
+
+  .ccp-grid-time-axis {
+    position: relative;
+    font-size: var(--calendar-card-font-size-time);
+    color: var(--calendar-card-color-time);
+    height: var(--calendar-card-grid-column-height, 768px);
+  }
+
+  .ccp-grid-hour-label {
+    height: var(--calendar-card-grid-hour-height, 48px);
+    box-sizing: border-box;
+    padding: 2px 4px;
+    text-align: end;
+    line-height: 1;
+    border-bottom: 1px solid color-mix(in srgb, var(--primary-text-color) 8%, transparent);
+  }
+
+  .ccp-grid-columns {
+    display: grid;
+    position: relative;
+    transition: transform 0.2s ease-out;
+  }
+
+  .ccp-grid-columns.swipe-left {
+    animation: ccp-swipe-left 0.25s ease-out;
+  }
+
+  .ccp-grid-columns.swipe-right {
+    animation: ccp-swipe-right 0.25s ease-out;
+  }
+
+  @keyframes ccp-swipe-left {
+    0% {
+      transform: translateX(30px);
+      opacity: 0.7;
+    }
+    100% {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes ccp-swipe-right {
+    0% {
+      transform: translateX(-30px);
+      opacity: 0.7;
+    }
+    100% {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  .ccp-grid-day-column {
+    position: relative;
+    /* Height must match the time-axis: (endHour - startHour) * hourHeight.
+       Default: 16 hours × 48px = 768px. Overridden via inline style when
+       config changes start/end hour. */
+    height: var(--calendar-card-grid-column-height, 768px);
+    overflow: hidden;
+    border-inline-start: 1px solid color-mix(in srgb, var(--primary-text-color) 10%, transparent);
+    /* Alternating hour-row backgrounds + hour boundary lines for visual alignment */
+    background-image:
+      repeating-linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--primary-text-color) 8%, transparent) 0px,
+        color-mix(in srgb, var(--primary-text-color) 8%, transparent) 1px,
+        transparent 1px,
+        transparent var(--calendar-card-grid-hour-height, 48px)
+      ),
+      repeating-linear-gradient(
+        to bottom,
+        transparent 0px,
+        transparent var(--calendar-card-grid-hour-height, 48px),
+        color-mix(in srgb, var(--primary-text-color) 3%, transparent)
+          var(--calendar-card-grid-hour-height, 48px),
+        color-mix(in srgb, var(--primary-text-color) 3%, transparent)
+          calc(var(--calendar-card-grid-hour-height, 48px) * 2)
+      );
+  }
+
+  .ccp-grid-day-column.today {
+    background-image:
+      repeating-linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--primary-text-color) 8%, transparent) 0px,
+        color-mix(in srgb, var(--primary-text-color) 8%, transparent) 1px,
+        transparent 1px,
+        transparent var(--calendar-card-grid-hour-height, 48px)
+      ),
+      repeating-linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--calendar-card-line-color-vertical) 4%, transparent) 0px,
+        color-mix(in srgb, var(--calendar-card-line-color-vertical) 4%, transparent)
+          var(--calendar-card-grid-hour-height, 48px),
+        color-mix(in srgb, var(--calendar-card-line-color-vertical) 7%, transparent)
+          var(--calendar-card-grid-hour-height, 48px),
+        color-mix(in srgb, var(--calendar-card-line-color-vertical) 7%, transparent)
+          calc(var(--calendar-card-grid-hour-height, 48px) * 2)
+      );
+  }
+
+  .ccp-grid-now-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--calendar-card-grid-now-line-color, var(--calendar-card-line-color-vertical));
+    pointer-events: none;
+    z-index: 3;
+  }
+
+  .ccp-grid-event {
+    position: absolute;
+    border-inline-start: 2px solid var(--calendar-card-line-color-vertical);
+    background: color-mix(in srgb, var(--calendar-card-line-color-vertical) 20%, transparent);
+    color: var(--calendar-card-color-event);
+    border-radius: var(--calendar-card-grid-event-radius, 4px);
+    font-size: var(--calendar-card-font-size-event);
+    overflow: hidden;
+    box-sizing: border-box;
+    padding: 2px 4px;
+    line-height: 1.2;
+    z-index: 2;
+    /* Slight inset so adjacent lane events don't touch */
+    margin-inline-end: 1px;
+    cursor: pointer;
+    transition: filter 0.15s ease;
+  }
+
+  .ccp-grid-event:hover {
+    filter: brightness(1.1);
+  }
+
+  .ccp-grid-event:active {
+    filter: brightness(0.9);
+  }
+
+  .ccp-grid-event.past-event {
+    opacity: 0.55;
+  }
+
+  /*
+   * FR-2.6 clip indicators. Pseudo-elements are decorative — screen readers
+   * skip CSS-generated content by default, and the event title + time still
+   * convey the full information for AT. The event block itself uses
+   * position:absolute so these absolute pseudo-children anchor to its box.
+   */
+  .ccp-grid-event.clipped-top::before {
+    content: '↑';
+    position: absolute;
+    top: 0;
+    inset-inline-start: 2px;
+    font-size: 10px;
+    line-height: 1;
+    opacity: 0.7;
+    pointer-events: none;
+  }
+
+  .ccp-grid-event.clipped-bottom::after {
+    content: '↓';
+    position: absolute;
+    bottom: 0;
+    inset-inline-start: 2px;
+    font-size: 10px;
+    line-height: 1;
+    opacity: 0.7;
+    pointer-events: none;
+  }
+
+  .ccp-grid-event-title {
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .ccp-grid-event-time {
+    font-size: var(--calendar-card-font-size-time);
+    opacity: 0.85;
+  }
+
+  .ccp-grid-event-location {
+    font-size: var(--calendar-card-font-size-location);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0.85;
+  }
+
+  .ccp-grid-hidden-pill {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    right: 2px;
+    font-size: 10px;
+    opacity: 0.7;
+    text-align: center;
+  }
+
+  .ccp-grid-allday-banner {
+    border-radius: var(--calendar-card-grid-event-radius, 4px);
+    padding: 2px 6px;
+    margin: 1px;
+    border-inline-start: 2px solid var(--calendar-card-line-color-vertical);
+    color: var(--calendar-card-color-event);
+    font-size: var(--calendar-card-font-size-event);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    cursor: pointer;
+  }
+
+  .ccp-grid-allday-banner.past-event {
+    opacity: 0.55;
+  }
+
+  .ccp-grid-allday-overflow {
+    opacity: 0.6;
+    margin: 0 4px;
+  }
+
+  /* ===== Event detail overlay ===== */
+  .ccp-event-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .ccp-event-detail {
+    background: var(--card-background-color, var(--ha-card-background, #fff));
+    border-radius: var(--ha-card-border-radius, 12px);
+    padding: 16px;
+    max-width: 320px;
+    width: 100%;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    max-height: 80%;
+    overflow-y: auto;
+    user-select: text;
+    -webkit-user-select: text;
+  }
+
+  .ccp-event-detail-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .ccp-event-detail-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--primary-text-color);
+    line-height: 1.3;
+    flex: 1;
+    margin-right: 8px;
+  }
+
+  .ccp-event-detail-close {
+    background: transparent;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    color: var(--secondary-text-color);
+    padding: 0 4px;
+    line-height: 1;
+  }
+
+  .ccp-event-detail-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: var(--primary-text-color);
+  }
+
+  .ccp-event-detail-row ha-icon {
+    --mdc-icon-size: 18px;
+    color: var(--secondary-text-color);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .ccp-event-detail-desc span {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .ccp-event-detail-location {
+    align-items: flex-start;
+  }
+
+  .ccp-event-detail-loc-text {
+    flex: 1;
+    word-break: break-word;
+  }
+
+  .ccp-event-detail-copy {
+    background: transparent;
+    border: 1px solid color-mix(in srgb, var(--primary-text-color) 20%, transparent);
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--secondary-text-color);
+    font-size: 14px;
+    width: 28px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+
+  .ccp-event-detail-copy:hover {
+    background: color-mix(in srgb, var(--primary-text-color) 8%, transparent);
   }
 `;

@@ -47,10 +47,13 @@ export function renderMainCardStructure(
   },
   maxHeightSet: boolean = false,
   isLoading: boolean = false,
+  isGridView: boolean = false,
 ): TemplateResult {
   return html`
     <ha-card
-      class="calendar-card-pro ${maxHeightSet ? 'max-height-set' : ''}"
+      class="calendar-card-pro ${maxHeightSet ? 'max-height-set' : ''} ${isGridView
+        ? 'view-grid'
+        : ''}"
       style=${styleMap(customStyles)}
       tabindex="0"
       aria-busy=${isLoading ? 'true' : 'false'}
@@ -60,8 +63,7 @@ export function renderMainCardStructure(
       @pointercancel=${handlers.pointerCancel}
       @pointerleave=${handlers.pointerLeave}
     >
-      <ha-ripple></ha-ripple>
-
+      ${isGridView ? nothing : html`<ha-ripple></ha-ripple>`}
       ${isLoading
         ? html`
             <div class="loading-indicator" role="status" aria-live="polite" title="Loading">
