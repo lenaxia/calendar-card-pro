@@ -257,6 +257,7 @@ function renderTimeGridUnsafe(
         >
           »
         </button>
+        <span class="ccp-grid-month-label">${formatMonthYear(days, language)}</span>
       </div>
       <div class="ccp-grid-headers" style=${styleMap({ gridTemplateColumns: gridColumns })}>
         <div class="ccp-grid-axis-spacer"></div>
@@ -619,6 +620,23 @@ export function formatRangeLabel(days: Date[], language: string): string {
     return formatRangeLabelUnsafe(days, language);
   } catch {
     return formatRangeLabelUnsafe(days, 'en');
+  }
+}
+
+function formatMonthYear(days: Date[], language: string): string {
+  if (days.length === 0) return '';
+  const first = days[0];
+  const last = days[days.length - 1];
+  try {
+    if (first.getMonth() === last.getMonth()) {
+      return getFormatter(language, { month: 'long', year: 'numeric' }).format(first);
+    }
+    // Spans two months — show both
+    const fmtMonth = getFormatter(language, { month: 'short' });
+    const fmtYear = getFormatter(language, { year: 'numeric' });
+    return `${fmtMonth.format(first)} – ${fmtMonth.format(last)} ${fmtYear.format(last)}`;
+  } catch {
+    return getFormatter('en', { month: 'long', year: 'numeric' }).format(first);
   }
 }
 

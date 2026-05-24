@@ -125,6 +125,10 @@ export const cardStyles = css`
     cursor: pointer;
   }
 
+  ha-card.view-grid {
+    cursor: default;
+  }
+
   /* Focus states */
   ha-card:focus {
     outline: none;
@@ -753,6 +757,13 @@ export const cardStyles = css`
 
   .ccp-grid-nav button.ccp-grid-today:active {
     background: color-mix(in srgb, var(--calendar-card-line-color-vertical) 30%, transparent);
+  }
+
+  .ccp-grid-month-label {
+    margin-inline-start: auto;
+    font-size: var(--calendar-card-font-size-event);
+    font-weight: 500;
+    color: var(--calendar-card-color-weekday);
   }
 
   .ccp-grid-nav button:focus-visible {

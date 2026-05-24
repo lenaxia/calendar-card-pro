@@ -691,15 +691,26 @@ class CalendarCardPro extends LitElement {
    */
   render() {
     const customStyles = this.getCustomStyles();
+    const isGridView = this.config.view === 'time-grid';
 
     // Create event handlers object for the card
-    const handlers = {
-      keyDown: (ev: KeyboardEvent) => this._handleKeyDown(ev),
-      pointerDown: (ev: PointerEvent) => this._handlePointerDown(ev),
-      pointerUp: (ev: PointerEvent) => this._handlePointerUp(ev),
-      pointerCancel: () => this._handlePointerCancel(),
-      pointerLeave: () => this._handlePointerCancel(),
-    };
+    // Grid view has its own nav buttons; disable card-level tap/hold
+    const noop = () => {};
+    const handlers = isGridView
+      ? {
+          keyDown: noop as unknown as (ev: KeyboardEvent) => void,
+          pointerDown: noop as unknown as (ev: PointerEvent) => void,
+          pointerUp: noop as unknown as (ev: PointerEvent) => void,
+          pointerCancel: noop as unknown as (ev: Event) => void,
+          pointerLeave: noop as unknown as (ev: Event) => void,
+        }
+      : {
+          keyDown: (ev: KeyboardEvent) => this._handleKeyDown(ev),
+          pointerDown: (ev: PointerEvent) => this._handlePointerDown(ev),
+          pointerUp: (ev: PointerEvent) => this._handlePointerUp(ev),
+          pointerCancel: () => this._handlePointerCancel(),
+          pointerLeave: () => this._handlePointerCancel(),
+        };
 
     // Determine card content based on state
     let content: TemplateResult;
@@ -722,6 +733,7 @@ class CalendarCardPro extends LitElement {
       handlers,
       false,
       this.isLoading,
+      isGridView,
     );
   }
 
