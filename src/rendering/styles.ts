@@ -820,6 +820,22 @@ export const cardStyles = css`
     line-height: 1.2;
   }
 
+  .ccp-grid-day-header-weather {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    margin-top: 2px;
+    opacity: 0.85;
+  }
+
+  .ccp-grid-day-header-weather ha-icon {
+    margin: 0;
+  }
+
+  .ccp-grid-weather-low {
+    opacity: 0.7;
+  }
+
   .ccp-grid-allday {
     max-height: var(--calendar-card-grid-allday-max-height, 6em);
     overflow: hidden;

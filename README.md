@@ -43,6 +43,7 @@ Built with **performance in mind**, the card leverages **intelligent refresh mec
 - 🎨 **Sleek & Minimalist Design** – Clean, modern, and visually appealing layout.
 - ✅ **Multi-Calendar Support** – Display multiple calendars with unique styling.
 - 📅 **Compact & Expandable Views** – Adaptive views to suit different dashboard needs.
+- 📆 **Time-Grid View** – Google Calendar-style day/week layout with time axis, swipe navigation, and event detail popups.
 - ⚙️ **Visual Configuration Editor** – Intuitive interface for effortless card setup.
 - 🔧 **Highly Customizable** – Fine-tune layout, colors, event details, and behavior.
 - 🌦️ **Weather Integration** – Display weather forecasts alongside your calendar events.
@@ -1071,6 +1072,67 @@ hold_action:
 | `none`         | Disable the action                            | None                                                      |
 
 All actions integrate seamlessly with Home Assistant's native ripple effect and haptic feedback for a polished user experience.
+
+### 📆 Time-Grid View
+
+Calendar Card Pro includes a **time-grid view** that displays events in a Google Calendar-style day/week layout with a vertical time axis.
+
+#### Enabling the Time-Grid View
+
+```yaml
+type: custom:calendar-card-pro
+entities:
+  - calendar.personal
+  - calendar.work
+view: time-grid
+```
+
+#### Features
+
+- **Multi-day columns** — 1, 3, or 7 day columns (auto-responsive based on card width)
+- **Time axis** — Configurable start/end hours with half-hour slot resolution
+- **Per-entity colors** — Each calendar gets its own accent color
+- **Navigation** — ‹/› day buttons, «/» window buttons, "Today" button, swipe gestures
+- **Now line** — Current time indicator that updates every 60 seconds
+- **Auto-scroll** — Scrolls to current time on load
+- **Event detail popup** — Click any event to see full details (time, location, description)
+- **All-day banners** — All-day events shown in a banner row above the time grid
+- **Weather** — Daily weather shown in day column headers (when configured)
+- **Swipe navigation** — Swipe left/right to navigate days (with slide animation)
+- **Text selection** — Select and copy event text directly from the card
+
+#### Time-Grid Configuration
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `view` | string | `list` | View mode: `list` (default) or `time-grid` |
+| `time_grid_start_hour` | number | `6` | First visible hour (0–23) |
+| `time_grid_end_hour` | number | `22` | Last visible hour (1–24, must be > start) |
+| `time_grid_interval_minutes` | number | `30` | Slot interval in minutes |
+| `time_grid_event_min_height_px` | number | `24` | Minimum pixel height for short events |
+| `time_grid_show_now_line` | boolean | `true` | Show current-time indicator line |
+| `time_grid_max_days` | number | `7` | Maximum columns (1, 3, or 7) |
+| `time_grid_breakpoint_three_day_px` | number | `500` | Card width to switch from 1→3 columns |
+| `time_grid_breakpoint_seven_day_px` | number | `900` | Card width to switch from 3→7 columns |
+| `time_grid_navigation_days` | number | `28` | Total navigable range in days |
+
+#### Example: Time-Grid with Weather
+
+```yaml
+type: custom:calendar-card-pro
+entities:
+  - entity: calendar.personal
+    accent_color: "#4CAF50"
+  - entity: calendar.work
+    accent_color: "#2196F3"
+view: time-grid
+time_grid_start_hour: 7
+time_grid_end_hour: 21
+max_height: 600px
+weather:
+  entity: weather.home
+  position: date
+```
 
 ### Performance & Theme Integration
 

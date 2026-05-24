@@ -915,6 +915,7 @@ class CalendarCardPro extends LitElement {
         canShiftForward: this.viewOffsetDays < this._maxOffset(),
       },
       this.safeHass,
+      this.weatherForecasts,
     );
   }
 }

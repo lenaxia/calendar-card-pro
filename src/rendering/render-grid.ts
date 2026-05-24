@@ -18,6 +18,7 @@ import * as FormatUtils from '../utils/format';
 import * as Grid from '../utils/grid';
 import * as Helpers from '../utils/helpers';
 import * as Logger from '../utils/logger';
+import * as Weather from '../utils/weather';
 
 //-----------------------------------------------------------------------------
 // PUBLIC TYPES
@@ -142,9 +143,10 @@ export function renderTimeGrid(
   language: string,
   ctx: TimeGridContext,
   hass?: Types.Hass | null,
+  weatherForecasts?: Types.WeatherForecasts,
 ): TemplateResult {
   try {
-    return renderTimeGridUnsafe(events, config, language, ctx, hass);
+    return renderTimeGridUnsafe(events, config, language, ctx, hass, weatherForecasts);
   } catch (err) {
     Logger.error('Failed to render time-grid view', err);
     const errorLabel = String(Localize.translate(language, 'error', 'Error loading calendar'));
@@ -162,6 +164,7 @@ function renderTimeGridUnsafe(
   language: string,
   ctx: TimeGridContext,
   hass?: Types.Hass | null,
+  weatherForecasts?: Types.WeatherForecasts,
 ): TemplateResult {
   const reference = Grid.getReferenceDate(config);
   const firstDayOfWeek = FormatUtils.getFirstDayOfWeek(config.first_day_of_week, language);
@@ -306,6 +309,7 @@ function renderTimeGridUnsafe(
               ${isFirstOfMonth(day)
                 ? html`<span class="ccp-grid-day-header-month">${formatMonth(day, language)}</span>`
                 : nothing}
+              ${renderDayHeaderWeather(day, config, weatherForecasts)}
             </div>
           `,
         )}
@@ -622,6 +626,37 @@ function addDays(d: Date, n: number): Date {
 
 function isFirstOfMonth(d: Date): boolean {
   return d.getDate() === 1;
+}
+
+function renderDayHeaderWeather(
+  day: Date,
+  config: Types.Config,
+  weatherForecasts?: Types.WeatherForecasts,
+): TemplateResult | typeof nothing {
+  const showWeather =
+    (config.weather?.position === 'date' || config.weather?.position === 'both') &&
+    config.weather?.entity;
+  if (!showWeather || !weatherForecasts?.daily) return nothing;
+
+  const forecast = Weather.findDailyForecast(day, weatherForecasts.daily);
+  if (!forecast) return nothing;
+
+  const dateConfig = config.weather?.date || {};
+  const showConditions = dateConfig.show_conditions !== false;
+  const showHighTemp = dateConfig.show_high_temp !== false;
+  const showLowTemp = dateConfig.show_low_temp === true && forecast.templow !== undefined;
+  const iconSize = dateConfig.icon_size || '14px';
+  const fontSize = dateConfig.font_size || '11px';
+
+  return html`
+    <span class="ccp-grid-day-header-weather" style="font-size: ${fontSize};">
+      ${showConditions
+        ? html`<ha-icon .icon=${forecast.icon} style="--mdc-icon-size: ${iconSize};"></ha-icon>`
+        : nothing}
+      ${showHighTemp ? html`<span>${forecast.temperature}°</span>` : nothing}
+      ${showLowTemp ? html`<span class="ccp-grid-weather-low">/${forecast.templow}°</span>` : nothing}
+    </span>
+  `;
 }
 
 function buildHourLabels(startHour: number, endHour: number): number[] {
