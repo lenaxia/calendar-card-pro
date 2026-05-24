@@ -64,6 +64,7 @@ export interface AllDayBanner {
  * Higher-order helper for navigation button click handlers. The card root
  * registers pointer/tap-action listeners that bubble; nav clicks must stop
  * propagation so a click on `<` does not also fire the card's tap_action.
+ * Also stops pointerdown to prevent the card's hold-timer from starting.
  * Module-scoped so the outer closure is stable across renders (only the
  * inner closure is fresh per template binding).
  */
@@ -73,6 +74,10 @@ const navClick =
     e.stopPropagation();
     handler();
   };
+
+const navPointerDown = (e: Event): void => {
+  e.stopPropagation();
+};
 
 /**
  * The time-axis column width is owned by CSS (`--calendar-card-grid-time-axis-width`,
@@ -209,6 +214,7 @@ function renderTimeGridUnsafe(
           aria-label=${prevWindowLabel}
           ?disabled=${backDisabled}
           @click=${navClick(() => ctx.onShiftWindow(-1))}
+          @pointerdown=${navPointerDown}
         >
           «
         </button>
@@ -218,6 +224,7 @@ function renderTimeGridUnsafe(
               aria-label=${prevDayLabel}
               ?disabled=${backDisabled}
               @click=${navClick(() => ctx.onShiftDay(-1))}
+              @pointerdown=${navPointerDown}
             >
               ‹
             </button>`
@@ -226,6 +233,7 @@ function renderTimeGridUnsafe(
           class="ccp-grid-today"
           aria-label=${todayLabel}
           @click=${navClick(ctx.onResetToToday)}
+          @pointerdown=${navPointerDown}
         >
           ${todayLabel}
         </button>
@@ -235,6 +243,7 @@ function renderTimeGridUnsafe(
               aria-label=${nextDayLabel}
               ?disabled=${forwardDisabled}
               @click=${navClick(() => ctx.onShiftDay(1))}
+              @pointerdown=${navPointerDown}
             >
               ›
             </button>`
@@ -244,10 +253,10 @@ function renderTimeGridUnsafe(
           aria-label=${nextWindowLabel}
           ?disabled=${forwardDisabled}
           @click=${navClick(() => ctx.onShiftWindow(1))}
+          @pointerdown=${navPointerDown}
         >
           »
         </button>
-        <span class="ccp-grid-range">${formatRangeLabel(days, language)}</span>
       </div>
       <div class="ccp-grid-headers" style=${styleMap({ gridTemplateColumns: gridColumns })}>
         <div class="ccp-grid-axis-spacer"></div>

@@ -149,17 +149,13 @@ export const cardStyles = css`
     padding-bottom: 1px;
     hyphens: auto;
     scrollbar-gutter: stable;
-
-    /* Hide scrollbars across browsers */
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE/Edge */
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
   }
 
-  /* Show scrollbars on hover */
+  /* Show scrollbar track on hover */
   .content-container:hover {
-    scrollbar-width: thin; /* Firefox */
-    scrollbar-color: var(--secondary-text-color) transparent; /* Firefox */
-    -ms-overflow-style: auto; /* IE/Edge */
+    scrollbar-color: var(--secondary-text-color) transparent;
   }
 
   .card-header-placeholder {
@@ -722,9 +718,41 @@ export const cardStyles = css`
     border: none;
     color: inherit;
     font: inherit;
-    padding: 2px 6px;
+    min-width: 36px;
+    min-height: 36px;
+    padding: 4px 10px;
     cursor: pointer;
-    border-radius: 4px;
+    border-radius: 8px;
+    font-size: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.15s ease;
+  }
+
+  .ccp-grid-nav button:hover {
+    background: color-mix(in srgb, var(--primary-text-color) 8%, transparent);
+  }
+
+  .ccp-grid-nav button:active {
+    background: color-mix(in srgb, var(--primary-text-color) 16%, transparent);
+  }
+
+  .ccp-grid-nav button.ccp-grid-today {
+    font-size: var(--calendar-card-font-size-event);
+    font-weight: 500;
+    background: color-mix(in srgb, var(--calendar-card-line-color-vertical) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--calendar-card-line-color-vertical) 30%, transparent);
+    color: var(--calendar-card-line-color-vertical);
+    padding: 4px 14px;
+  }
+
+  .ccp-grid-nav button.ccp-grid-today:hover {
+    background: color-mix(in srgb, var(--calendar-card-line-color-vertical) 20%, transparent);
+  }
+
+  .ccp-grid-nav button.ccp-grid-today:active {
+    background: color-mix(in srgb, var(--calendar-card-line-color-vertical) 30%, transparent);
   }
 
   .ccp-grid-nav button:focus-visible {
@@ -736,11 +764,7 @@ export const cardStyles = css`
   .ccp-grid-nav button:disabled {
     opacity: 0.4;
     cursor: not-allowed;
-  }
-
-  .ccp-grid-range {
-    margin-inline-start: auto;
-    font-size: var(--calendar-card-font-size-event);
+    pointer-events: none;
   }
 
   .ccp-grid-headers,
