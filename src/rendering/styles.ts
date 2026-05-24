@@ -148,6 +148,7 @@ export const cardStyles = css`
     overflow-y: auto;
     padding-bottom: 1px;
     hyphens: auto;
+    scrollbar-gutter: stable;
 
     /* Hide scrollbars across browsers */
     scrollbar-width: none; /* Firefox */
@@ -796,12 +797,16 @@ export const cardStyles = css`
     position: relative;
     font-size: var(--calendar-card-font-size-time);
     color: var(--calendar-card-color-time);
+    height: var(--calendar-card-grid-column-height, 768px);
   }
 
   .ccp-grid-hour-label {
+    height: var(--calendar-card-grid-hour-height, 48px);
+    box-sizing: border-box;
     padding: 2px 4px;
     text-align: end;
     line-height: 1;
+    border-bottom: 1px solid color-mix(in srgb, var(--primary-text-color) 8%, transparent);
   }
 
   .ccp-grid-columns {
@@ -811,15 +816,51 @@ export const cardStyles = css`
 
   .ccp-grid-day-column {
     position: relative;
-    /* Must match SLOT_HEIGHT_PX in src/utils/grid.ts. A CSS-variable bridge
-       was deliberately rejected by the design — see AGENTS.md "Key Design
-       Decisions". Update both sites together if changing. */
-    min-height: 24px;
+    /* Height must match the time-axis: (endHour - startHour) * hourHeight.
+       Default: 16 hours × 48px = 768px. Overridden via inline style when
+       config changes start/end hour. */
+    height: var(--calendar-card-grid-column-height, 768px);
+    overflow: hidden;
     border-inline-start: 1px solid var(--calendar-card-day-separator-color, transparent);
+    /* Alternating hour-row backgrounds + hour boundary lines for visual alignment */
+    background-image:
+      repeating-linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--primary-text-color) 8%, transparent) 0px,
+        color-mix(in srgb, var(--primary-text-color) 8%, transparent) 1px,
+        transparent 1px,
+        transparent var(--calendar-card-grid-hour-height, 48px)
+      ),
+      repeating-linear-gradient(
+        to bottom,
+        transparent 0px,
+        transparent var(--calendar-card-grid-hour-height, 48px),
+        color-mix(in srgb, var(--primary-text-color) 3%, transparent)
+          var(--calendar-card-grid-hour-height, 48px),
+        color-mix(in srgb, var(--primary-text-color) 3%, transparent)
+          calc(var(--calendar-card-grid-hour-height, 48px) * 2)
+      );
   }
 
   .ccp-grid-day-column.today {
-    background: color-mix(in srgb, var(--calendar-card-line-color-vertical) 4%, transparent);
+    background-image:
+      repeating-linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--primary-text-color) 8%, transparent) 0px,
+        color-mix(in srgb, var(--primary-text-color) 8%, transparent) 1px,
+        transparent 1px,
+        transparent var(--calendar-card-grid-hour-height, 48px)
+      ),
+      repeating-linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--calendar-card-line-color-vertical) 4%, transparent) 0px,
+        color-mix(in srgb, var(--calendar-card-line-color-vertical) 4%, transparent)
+          var(--calendar-card-grid-hour-height, 48px),
+        color-mix(in srgb, var(--calendar-card-line-color-vertical) 7%, transparent)
+          var(--calendar-card-grid-hour-height, 48px),
+        color-mix(in srgb, var(--calendar-card-line-color-vertical) 7%, transparent)
+          calc(var(--calendar-card-grid-hour-height, 48px) * 2)
+      );
   }
 
   .ccp-grid-now-line {
@@ -829,7 +870,7 @@ export const cardStyles = css`
     height: 2px;
     background: var(--calendar-card-grid-now-line-color, var(--calendar-card-line-color-vertical));
     pointer-events: none;
-    z-index: 1;
+    z-index: 3;
   }
 
   .ccp-grid-event {
@@ -843,6 +884,9 @@ export const cardStyles = css`
     box-sizing: border-box;
     padding: 2px 4px;
     line-height: 1.2;
+    z-index: 2;
+    /* Slight inset so adjacent lane events don't touch */
+    margin-inline-end: 1px;
   }
 
   .ccp-grid-event.past-event {

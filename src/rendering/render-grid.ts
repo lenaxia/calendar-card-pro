@@ -144,6 +144,12 @@ function renderTimeGridUnsafe(
   const gridEndMin = config.time_grid_end_hour * 60;
   const minHeightPx = config.time_grid_event_min_height_px;
 
+  // Compute pixel dimensions for the grid layout
+  const slotsPerHour = 60 / intervalMin;
+  const hourHeightPx = slotHeightPx * slotsPerHour;
+  const totalHours = config.time_grid_end_hour - config.time_grid_start_hour;
+  const columnHeightPx = totalHours * hourHeightPx;
+
   const todayIdx = computeTodayIdx(windowStart, ctx.now, ctx.visibleDays);
 
   // Now-line top position. Computed once per render. When today is not in the
@@ -266,7 +272,13 @@ function renderTimeGridUnsafe(
               ${allDayBanners.map((banner) => renderAllDayBanner(banner, config, ctx.now))}
             </div>
           `}
-      <div class="ccp-grid-body" style=${styleMap({ gridTemplateColumns: gridColumns })}>
+      <div
+        class="ccp-grid-body"
+        style=${styleMap({
+          '--calendar-card-grid-hour-height': `${hourHeightPx}px`,
+          '--calendar-card-grid-column-height': `${columnHeightPx}px`,
+        })}
+      >
         <div class="ccp-grid-time-axis">
           ${hourLabels.map(
             (h) => html`<div class="ccp-grid-hour-label">${Grid.formatHourLabel(h, use24h)}</div>`,
@@ -404,7 +416,7 @@ function renderEventBlock(
         top: `${placement.topPx}px`,
         height: `${placement.heightPx}px`,
         left: `${leftPct}%`,
-        width: `${widthPct}%`,
+        width: `calc(${widthPct}% - 2px)`,
       })}
     >
       <div class="ccp-grid-event-title">${event.summary ?? ''}</div>
